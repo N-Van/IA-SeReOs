@@ -1,0 +1,5 @@
+RDN_segmentation_container/Data/
+RDN_segmentation_container/RDN_pytorch
+*.exe
+Installation
+Training_IA-SeReOs.py

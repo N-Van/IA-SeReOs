@@ -1,0 +1,52 @@
+Prior to First Use:
+-Please ensure that you have Anaconda OR Miniconda on your computer (https://docs.conda.io/en/latest/miniconda.html).
+-Please ensure that your NVIDIA graphics drivers are up to date.
+
+To Install:
+Save a copy of the RDN_segmentation folder onto your computer.
+In the main RDN_segmentation folder, double click on the Install.bat file.
+If you receive a security warning, click Run.
+
+This will open a command prompt that will begin the installation process. If you get a prompt that reads: Proceed ([y]/n)? type y and hit enter.
+It will download and extract packages. It will then make a directory within the RDN_segmentation file called RDN_pytorch.
+It will then create a pytorch environment using the pytorch.tar.gz file. You do not need to do anything here. 
+	**This may take a while so please do not terminate the process or close the window.***
+It will then display call conda unpack. **This may also take a while.**
+When it is done, it will automatically open a streamlit window in your browser. 
+
+To Use RDN Segmenter in Streamlit AFTER Initial Install:
+After your first use, you can simply double click on the Run.bat and a streamlit window will open in your browser
+
+How to segment in the RDN segmenter:
+First, initialize GPU. To do this, click on the button on the left hand menu that says "Initialize GPU"
+On the main menu, under Model settings, click the "New model settings" button and direct it to where your segmentation model lives on your computer. 
+	We have included some models (.pth files) in RDN_segmentation\MARS\morphology\segmentation\pytorch_segmentation\model
+	For example, in the prompt, you would paste: C:\Users\skk5802\Desktop\RDN_segmentation\MARS\morphology\segmentation\pytorch_segmentation\model
+Hit Enter
+Choose which model you would like to use from the dropdown menu. If there is only one .pth file, it will automatically select that one. 
+For single segmentations, you can go directly to "Single Segmentation" on the left hand menu. 
+	Hit "New input/output settings" and paste the input path (where the unsegmented files live) in "Input location."
+	Choose the input file type (what file type the original data are).
+	Paste the output location (where you would like the segmented files to go).
+	Choose the output file type (what type of file you would like the segmented data to be).
+	If applicable (i.e., for mhd input files), select which file you would like to segment in the dropdown menu
+	You may rescale to 255 prior to segmentation by clicking on the "Rescale to 255 prior to segmentation?" check box.
+	You may also exclude metal or bright inclusions by clicking the "Check for metal/bright inclusions?" check box (only appears if you rescale to 255) and input the threshold you would like to exclude.
+	Scroll down and check that all your settings are correct. 
+	Hit the "Load model!" button and then hit the "Segment!" button
+For batch segmentations, remain on the Settings page. 
+	If you already have an RDN par file, simply click the "Load from new location" button under the Batch mode Input/Output settings menu on the right hand side and paste the location of your par file. Select the correct file and click the "Load and view paramter file" checkbox.
+	If you do not have a par file, you can create one from a directory by hitting the "Build parameters from directory" button. Input the directory where all of your files are, choose the input file type, input the segmentation output directory (where you would like the segmented files to end up) and the output file type (what kind of file you would like your segmented files to be).
+		Click "Generate parameter file," click the "Save parameter file" checkbox, input where you would like the par file to be saved under "Save directory" and what you would like it to be called under "Save name" and click the "Save parameter!" button.
+	If you have a Medtool par file that you would like to turn into an RDN par file, click the "Parameters from Medtool par file" and put the location of the Medtool par file in "Medtool par input directory" then choose the input file types, choose which par file to use in the dropdown menu, and put where you would like the new RDN par file to be saved in the "RDN par file output directory" box. Check off the "Convert parameter file" checkbox and hit the "Save converted parameter file" button.
+	One your par file is set, go to "Batch segmentation" on the left hand menu.
+	Scroll down and click the "Load model!" button and then the "Load parameter file" button. 
+	Click the "View parameters file" button and check to make sure everything looks ok. 
+	Then click the "Everything looks ok" check box.
+	You may rescale to 255 prior to segmentation by clicking on the "Rescale to 255 prior to segmentation?" check box.
+	You may also exclude metal or bright inclusions by clicking the "Check for  metal/bright inclusions?" check box (only appears if you rescale to 255) and input the threshold you would like to exclude.
+	Click the "Segment" button.
+
+If problems persist, please contact Tim Ryan (tmr21@psu.edu) or Sharon Kuo (sharonkuo@psu.edu).
+
+We would like to thank Nick Stephens for preparing and developing the RDN segmentation module and Amirsaeed Yazdani for his help in preparing this container. 
