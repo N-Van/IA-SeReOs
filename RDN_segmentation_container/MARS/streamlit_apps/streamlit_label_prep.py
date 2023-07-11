@@ -61,11 +61,16 @@ from utils.train import rdn_train, rdn_val
 from utils.dataset import HDF52D, load_patches, natural_keys
 from utils.losses import DomainEnrichLoss, dice_loss, DiceOverlap, Accuracy
 
+import torchvision
+
+from torch.utils.tensorboard import SummaryWriter
+
 #To easily adjust drop down menus
 supported_file_types = ["mhd", "nii", "tif", "png", "jpg", "bmp", "dcm"]
 slice_types = ["tif", "png", "jpg", "jpeg", "bmp", "dcm"]
 volume_types = ["mhd", "mha", "nii", "vtk"]
 supported_optimizers = ["Adam", "AdaBelief"]
+
 
 #Get the small logo for the tab
 tab_logo = Image.open(str(script_dir.joinpath('streamlit_apps').joinpath('moon_square.png')))
@@ -859,7 +864,6 @@ def main():
                         else:
                             net.load_state_dict(torch.load(config['model']['path']))
                 state.net = net
-
                 if str(config['optimizer']['method']) == "AdaBelief":
                     optimizer = AdaBelief(net.parameters(),
                                         lr=float(config['optimizer']['lr']),
@@ -876,7 +880,7 @@ def main():
                     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['period'], gamma=0.1)
 
 
-
+            
                 # save the yaml file to savepath
                 current_config = str(pathlib.Path(state.save_path).joinpath('Config.yaml'))
                 st.write(f"Saving session configuration to {current_config}")
@@ -905,11 +909,17 @@ def main():
                 val_transform = transforms.Compose([dp.AdjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
-
+                # if st.button("Launch Tensorboard !"):
+                    
+                #     subprocess.call('tensorboard --logdir=runs', shell=True)
+                #     st.write(f"TensorBoard 2.10.0 at http://localhost:6006/#timeseries")
+                    
                 if st.button("Train model!"):
                     # training
+
                     progress_bar = st.progress(0)
                     epoch_count = 0
+                    #st.write(f"TensorBoard is availaible, run this following command in a terminal : tensorboard --logdir=runs")
                     st.sidebar.write(f"Epoch progress:")
                     st.write(f"Progress training {Epoch} epochs...")
                     total_timer = timer()
@@ -960,7 +970,7 @@ def main():
                         print(f"learning rate {optimizer.param_groups[0]['lr']:.6f}")
 
                         rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
-                                total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'])
+                                total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'], tensorboard_plot=True)
                         #lr_scheduler.step()
 
                         # validating
@@ -1800,101 +1810,6 @@ def make_parallel(func):
             result = []
         return result
     return wrapper
-
-def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu=False,):
-    if use_gpu:
-        net.cuda()
-    else:
-        net.cpu()
-    bce_losses = nn.BCEWithLogitsLoss()
-    accuracy = Accuracy()
-
-    # set data_loader
-    data_loader1 = data_loader[0]
-    data_loader2 = data_loader[1]
-
-    it = iter(enumerate(data_loader2))
-    max_batches2 = len(data_loader2.dataset) // data_loader2.batch_size + (1 if (len(data_loader2.dataset) % data_loader2.batch_size) != 0 else 0)
-
-    # the epoch message for printing
-    epoch_print = 'Epoch:'
-    if epoch is not None:
-        epoch_print += f'{epoch + 1}'
-    if total_epoch is not None:
-        epoch_print += f'/{total_epoch}'
-    last_batches = 0.0
-    loss1_sum = 0.0
-    loss2_sum = 0.0
-    
-    chart_data = pd.DataFrame(np.array(np.array([0],dtype=float)),columns=['loss'])
-    chart_data2 = pd.DataFrame(np.array(np.array([0],dtype=float)),columns=['loss1'])
-    chart_data3 = pd.DataFrame(np.array(np.array([0],dtype=float)),columns=['loss2'])
-    with tqdm(total=len(data_loader1.dataset), desc=epoch_print, unit=' batches') as pbar:
-        progress_bar = st.sidebar.progress(0)
-        graph = st.line_chart(chart_data)
-        graph2 = st.line_chart(chart_data2)
-        graph3 = st.line_chart(chart_data3)
-        img_count = 0
-        start_train = timer()
-        for i_batches, sample_batched in enumerate(data_loader1):
-            last_batches = i_batches
-            i_batches2, sample_batched2 = next(it)
-            if i_batches2 + 1 >= max_batches2:
-                it = iter(enumerate(data_loader2))
-
-            mask = sample_batched['mask']
-            image = sample_batched['image']
-
-            image2 = sample_batched2['image']
-            index = sample_batched2['index']
-
-            # convert to gpu
-            if use_gpu:
-                mask = mask.cuda().long()
-                image = image.cuda()
-                image2 = image2.cuda()
-
-            # # prediction
-            net(image2)
-            loss1 = DomainEnrichLoss()(net, index)
-
-            pred = F.sigmoid(net(image))
-            mask = dp.create_one_hot(mask)
-            loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
-
-            loss = loss2 + 0.0001*loss1
-             
-            
-            chart_data = pd.DataFrame(np.array(np.array([np.array([loss.item()],dtype=float)],dtype=float)),columns=['loss'])
-            chart_data2 = pd.DataFrame(np.array(np.array([np.array([loss1.item()],dtype=float)],dtype=float)),columns=['loss1'])
-            chart_data3 = pd.DataFrame(np.array(np.array([np.array([loss2.item()],dtype=float)],dtype=float)),columns=['loss2'])
-            graph.add_rows(chart_data)
-            graph2.add_rows(chart_data2)
-            graph3.add_rows(chart_data3)
-
-            # backward
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # Print results
-            pbar.update(mask.shape[0])
-            pbar.set_postfix(loss=loss.cpu().data.numpy(), loss1=loss1.cpu().data.numpy(), loss2=loss2.cpu().data.numpy())
-            img_count += 1
-            iteration = np.floor((100 * img_count) / len(data_loader1))
-            progress_bar.progress(int(iteration))
-            
-            #Casting this as float explcitly seems to keep it from dropping off into NaN
-            loss1_sum = loss1_sum + float(loss1.cpu().data.numpy())
-            loss2_sum = loss2_sum + float(loss2.cpu().data.numpy())
-
-        _end_timer_sidebar(start_timer=start_train, message="Training")
-
-        loss1_sum_average = float(loss1_sum/(last_batches + 1))
-        loss2_sum_average = float(loss2_sum/(last_batches + 1))
-        st.text(f'Average loss: non-bone: {loss1_sum_average:.6f} bone: {loss2_sum_average:.6f}.')
-        st.write("\n")
-
 
 def download_model(model, model_name):
     """

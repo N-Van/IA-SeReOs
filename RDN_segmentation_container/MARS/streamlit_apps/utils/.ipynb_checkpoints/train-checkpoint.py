@@ -12,7 +12,7 @@ from utils.losses import DomainEnrichLoss, dice_loss, DiceOverlap, Accuracy
 bce_losses = nn.BCEWithLogitsLoss()
 accuracy = Accuracy()
 
-def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu = False):
+def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu = False, tensorboard_plot=False):
     if use_gpu:
         net.cuda()
     else:

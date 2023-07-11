@@ -3,3 +3,4 @@ RDN_segmentation_container/RDN_pytorch
 *.exe
 Installation
 Training_IA-SeReOs.py
+runs

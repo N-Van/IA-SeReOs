@@ -71,6 +71,7 @@ class HDF52D(Dataset):
 
         if self.transforms[self.mode] is not None:
             sample = self.transforms[self.mode](sample)
+            
         if self.train_idx is not None and self.mode == 'train':
             sample['index'] = self.train_idx[idx]
         return sample
