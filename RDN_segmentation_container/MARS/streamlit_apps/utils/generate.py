@@ -145,7 +145,7 @@ def generate_ratios(data_path, patches_path, class_num=3):
 
 def get_dirt_bone_patches(patches, ratios):
     ratios = np.array(ratios)
-    ratios_idx = np.argsort(-ratios, axis=0)
+    ratios_idx = np.argsort(-ratios, axis=0) # axis=0 = terre ?
 
     # get the patches
     dirt_idx = ratios_idx[:, 1]
@@ -188,34 +188,43 @@ def get_dirt_bone_patches(patches, ratios):
 
     return patches, d_index
 
+#Function that give a list of patches that contains dirt_rate percentage of dirt_patches (over dirt_choose_threshold ratio)
 def random_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
     # get ratios
     ratios = np.array(ratios)
+    # sort ratios
     ratios_idx = np.argsort(-ratios, axis=0)
 
+    # ratios dimension is n_patches x n_classes
+    # get dirt ratios
     dirt_idx = ratios_idx[:, 1]
-    # get the patches
+
+    # get only the patches that dirt ratio is > dirt_choose_threshold
     last_idx = 0
     for i in range(dirt_idx.shape[0]):
         dirt_ratio = ratios[dirt_idx[i], 1]
         if dirt_ratio < dirt_choose_threshold:
             last_idx = i
             break
-
+    
+    #indexes of wanted dirt_patches
     dirt_patches_idx = dirt_idx[0:last_idx]
+    #indexes of other patches
     rest_idx = dirt_idx[last_idx:-1]
 
+    
     if not (dirt_rate == 0):
         rest_num = round(((last_idx - 1) / dirt_rate) * (1 - dirt_rate))
         if rest_num > rest_idx.shape[0]:
             rest_num = rest_idx.shape[0]
     else:
         rest_num = rest_idx.shape[0]
-
+    
+    #Getting picking other patches
     random_idx = np.random.choice(rest_idx.shape[0], size=rest_num, replace=False)
     non_dirt_patches_idx = rest_idx[random_idx]
 
-    # choosing patches_idx
+    # Getting the final patches
     patches_idx = np.concatenate((dirt_patches_idx, non_dirt_patches_idx), axis=0)
     new_patches = np.asarray(patches)[patches_idx, :].tolist()
 
