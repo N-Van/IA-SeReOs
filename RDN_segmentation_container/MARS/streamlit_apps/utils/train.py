@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 bce_losses = nn.BCEWithLogitsLoss()
 accuracy = Accuracy()
 
-def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu = False, tensorboard_plot=False):
+def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu = False, tensorboard_plot=False, nb_ite=0):
     if use_gpu:
         net.cuda()
     else:
@@ -65,7 +65,10 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             pred = net(image)
             pred = F.sigmoid(pred)
             mask = dp.create_one_hot(mask)
-            
+            if tensorboard_plot and nb_ite+ite == 0:
+                writer = SummaryWriter("runs")
+                writer.add_graph(net, image)
+                writer.close()
             if tensorboard_plot and (ite % (max_batches1 // 3) == 0):
                 writer = SummaryWriter("runs")
                 if epoch is not None:
@@ -87,9 +90,9 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     # print("image",image)
                     # print("mask",mask_img)
                     # print("pred",pred_img)
-                    writer.add_image('input_image', torchvision.utils.make_grid(image),i_batches)
-                    writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),i_batches)
-                    writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),i_batches)
+                    writer.add_image('input_image', torchvision.utils.make_grid(image),nb_ite + last_batches)
+                    writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),nb_ite + last_batches)
+                    writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
                 
             
            
@@ -109,11 +112,12 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             pbar.set_postfix(loss=loss.cpu().data.numpy(),loss1=loss1.cpu().data.numpy(),loss2=loss2.cpu().data.numpy())
             loss1_sum = loss1_sum + loss1.cpu().data.numpy()
             loss2_sum = loss2_sum + loss2.cpu().data.numpy()
-            writer.add_scalars('Losses',{'loss':loss.cpu().data.numpy(),'loss1':loss1.cpu().data.numpy(),'loss2':loss2.cpu().data.numpy()}, epoch*len(data_loader1.dataset)+ last_batches)
-            writer.add_scalars('Average_Losses',{'loss':(loss2_sum / (last_batches + 1)) + 0.0001*(loss1_sum / (last_batches + 1)),'loss1':(loss1_sum / (last_batches + 1)),'loss2':(loss2_sum / (last_batches + 1))}, epoch*len(data_loader1.dataset)+ last_batches)
+            writer.add_scalars('Losses',{'loss':loss.cpu().data.numpy(),'loss1':loss1.cpu().data.numpy(),'loss2':loss2.cpu().data.numpy()}, nb_ite + last_batches)
+            writer.add_scalars('Average_Losses',{'loss':(loss2_sum / (last_batches + 1)) + 0.0001*(loss1_sum / (last_batches + 1)),'loss1':(loss1_sum / (last_batches + 1)),'loss2':(loss2_sum / (last_batches + 1))}, nb_ite + last_batches)
             ite += 1
         print(f'\nAverage, loss1: {(loss1_sum / (last_batches + 1)):.6f}, loss2: {(loss2_sum/ (last_batches + 1)):.6f}.')
         writer.close()
+    return nb_ite + last_batches
     ...
 
 def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):

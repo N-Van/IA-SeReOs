@@ -924,6 +924,8 @@ def main():
                     st.write(f"Progress training {Epoch} epochs...")
                     total_timer = timer()
                     iteration = 0
+                    nb_ite = 0
+                    #subprocess.call('echo "TensorBoard available, run this command to enable it : tensorboard --logdir=runs"', shell=True)
                     for i_epoch in range(Epoch):
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
                         if i_epoch < period:
@@ -969,8 +971,8 @@ def main():
 
                         print(f"learning rate {optimizer.param_groups[0]['lr']:.6f}")
 
-                        rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
-                                total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'], tensorboard_plot=True)
+                        nb_ite = rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
+                                total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'], tensorboard_plot=True, nb_ite=nb_ite)
                         #lr_scheduler.step()
 
                         # validating
