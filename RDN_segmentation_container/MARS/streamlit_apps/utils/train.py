@@ -20,8 +20,8 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
         net.cpu()
 
     # set data_loader
-    data_loader1 = data_loader[0]
-    data_loader2 = data_loader[1]
+    data_loader1 = data_loader[0] #random
+    data_loader2 = data_loader[1] #sorted
 
     it = iter(enumerate(data_loader2))
     max_batches2 = len(data_loader2.dataset) // data_loader2.batch_size + (1 if (len(data_loader2.dataset) % data_loader2.batch_size) != 0 else 0)
@@ -63,7 +63,6 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             
             loss1 = DomainEnrichLoss()(net, index)
             pred = net(image)
-            pred = F.sigmoid(pred)
             mask = dp.create_one_hot(mask)
             if tensorboard_plot and nb_ite+ite == 0:
                 writer = SummaryWriter("runs")
@@ -96,12 +95,10 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                 
             
            
-            
-            
-          
-            loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
+            #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
+            loss2 = bce_losses(pred, mask) 
 
-            loss = loss2 + 0.0001*loss1
+            loss = loss2 + loss1
             # backward
             optimizer.zero_grad()
             loss.backward()
@@ -113,7 +110,7 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             loss1_sum = loss1_sum + loss1.cpu().data.numpy()
             loss2_sum = loss2_sum + loss2.cpu().data.numpy()
             writer.add_scalars('Losses',{'loss':loss.cpu().data.numpy(),'loss1':loss1.cpu().data.numpy(),'loss2':loss2.cpu().data.numpy()}, nb_ite + last_batches)
-            writer.add_scalars('Average_Losses',{'loss':(loss2_sum / (last_batches + 1)) + 0.0001*(loss1_sum / (last_batches + 1)),'loss1':(loss1_sum / (last_batches + 1)),'loss2':(loss2_sum / (last_batches + 1))}, nb_ite + last_batches)
+            writer.add_scalars('Average_Losses',{'loss':(loss2_sum / (last_batches + 1)) + (loss1_sum / (last_batches + 1)),'loss1':(loss1_sum / (last_batches + 1)),'loss2':(loss2_sum / (last_batches + 1))}, nb_ite + last_batches)
             ite += 1
         print(f'\nAverage, loss1: {(loss1_sum / (last_batches + 1)):.6f}, loss2: {(loss2_sum/ (last_batches + 1)):.6f}.')
         writer.close()
