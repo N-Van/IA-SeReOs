@@ -69,7 +69,7 @@ class ToTensor(object):
 
             image = image.transpose((0, 3, 1, 2))
 
-        sample['image'] =  torch.from_numpy(image)
+        sample['image'] = torch.from_numpy(image)
         sample['mask'] = torch.from_numpy(mask)
 
         if 'weights' in sample:

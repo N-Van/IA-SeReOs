@@ -125,9 +125,11 @@ def generate_patches(data_path, names, stride=32, output_size=256):
         return patches
 
 def generate_ratios(data_path, patches_path, class_num=3):
+    #get patches
     patches = load_patches(patches_path)
     ratios = []
     with h5py.File(data_path, 'r') as data_file:
+        #for each patch
         for [name, top, left, h, w] in tqdm(patches, desc="Processing patches:", unit=" Patches"):
             mask = data_file[name]['label'][top: top+h, left: left+w]
             mask = dp.adjustMask(mask, class_num)
@@ -136,27 +138,33 @@ def generate_ratios(data_path, patches_path, class_num=3):
             for idx in range(len(mask.shape)):
                 size *= mask.shape[idx]
 
+            #Get ratio for the patch
             ratio = []
             for idx in range(class_num):
-                ratio.append(np.sum(mask == idx)/size)
+                ratio.append(np.sum(mask == idx)/size) 
 
             ratios.append(ratio)
     return ratios
 
+#function that create a list of patches that have contains more bone than dirt (or more dirt than bone) and shuffled
 def get_dirt_bone_patches(patches, ratios):
+    #get ratios 
     ratios = np.array(ratios)
-    ratios_idx = np.argsort(-ratios, axis=0) # axis=0 = terre ?
+    #get indices that would sort ratios by decreasing order
+    ratios_idx = np.argsort(-ratios, axis=0) 
 
-    # get the patches
+    # get the second column of ratio_idx which is the dirt index sorted by decreasing order
     dirt_idx = ratios_idx[:, 1]
+    #get patches 
     patches = np.asarray(patches)
 
+    #get ratios and patches sorted by decreasing dirt ratios 
     ratios_sort = ratios[dirt_idx, :]
     patches_sort = patches[dirt_idx, :]
 
     dirt_patches = []
     bone_patches = []
-
+    #get patches that contains significant differencies between dirt and bone ratios (>0.1)
     for idx in range(ratios_sort.shape[0]):
         if (ratios_sort[idx, 1] - ratios_sort[idx, 2] > 0.1):
             dirt_patches.append(patches_sort[idx, :].tolist())
@@ -165,23 +173,23 @@ def get_dirt_bone_patches(patches, ratios):
         else:
             pass
 
-    bone_index = [1 for i in range(len(bone_patches))]
-    dirt_index = [0 for i in range(len(dirt_patches))]
-
-    dirt_patches = shuffle(dirt_patches)
-    bone_patches = shuffle(bone_patches)
     dirt_len = len(dirt_patches)
     bone_len = len(bone_patches)
+
+    bone_index = [1 for i in range(bone_len)]
+    dirt_index = [0 for i in range(dirt_len)]
+    
+    dirt_patches = shuffle(dirt_patches)
+    bone_patches = shuffle(bone_patches)
+    
     print(f"There are {bone_len} bone and {dirt_len} dirt patches in the training data...")
 
     end_idx = dirt_len if dirt_len < bone_len else bone_len
-
+    #get the same quantity of dirt and bone patches
     patches = dirt_patches[0:end_idx] + bone_patches[0:end_idx]
     d_index = dirt_index[0:end_idx] + bone_index[0:end_idx]
 
     #This is the use of sklearn shuffle, which can't be replaced by the random shuffle
-    patches, d_index = shuffle(patches, d_index)
-    patches, d_index = shuffle(patches, d_index)
     patches, d_index = shuffle(patches, d_index)
     patches = [[name, int(top), int(left), int(h), int(w)] for [name, top, left, h, w] in patches]
     d_index = [int(idx) for idx in d_index]
@@ -192,11 +200,11 @@ def get_dirt_bone_patches(patches, ratios):
 def random_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
     # get ratios
     ratios = np.array(ratios)
-    # sort ratios
+    #get index that would sort ratios by decreasing order
     ratios_idx = np.argsort(-ratios, axis=0)
 
     # ratios dimension is n_patches x n_classes
-    # get dirt ratios
+    # get the second column of ratio_idx which is the dirt index sorted by decreasing order
     dirt_idx = ratios_idx[:, 1]
 
     # get only the patches that dirt ratio is > dirt_choose_threshold

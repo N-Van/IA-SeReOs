@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
-from math import pi
+
 import torch.nn.functional as F
 
 class Accuracy():
@@ -75,7 +75,7 @@ class DomainEnrichLoss():
         LDF_bone = - (self.alpha * rdn1_bone_norm2**2) + (self.beta * rdn1_dirt_norm2**2)
         LDF_dirt = (self.gamma * rdn2_bone_norm2**2) - (self.sigma * rdn2_dirt_norm2**2) + (self.zeta * rdn2_dirt_norm1)
 
-        return 0.5+torch.Tensor.arctan(self.lambda1*LDF_bone + self.lambda2*LDF_dirt)/pi
+        return torch.sigmoid(self.lambda1*LDF_bone + self.lambda2*LDF_dirt)
 
 class DiceOverlap():
 
