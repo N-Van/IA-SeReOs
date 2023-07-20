@@ -92,15 +92,14 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     writer.add_image('input_image', torchvision.utils.make_grid(image),nb_ite + last_batches)
                     writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),nb_ite + last_batches)
                     writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
-                
-            
-           
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
-            loss2 = bce_losses(pred, mask) 
+           
+            m = nn.Softmax(dim=3)
+            loss2 = nn.functional.cross_entropy(m(pred), mask)
 
             loss = loss2 + loss1
             # backward
-            optimizer.zero_grad()
+            optimizer.zero_grad() 
             loss.backward()
             optimizer.step()
 
