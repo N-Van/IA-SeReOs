@@ -62,8 +62,10 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             net(image2)
             
             loss1 = DomainEnrichLoss()(net, index)
-            pred = net(image)
+            pred = F.sigmoid(net(image))
             mask = dp.create_one_hot(mask)
+            loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
+
             if tensorboard_plot and nb_ite+ite == 0:
                 writer = SummaryWriter("runs")
                 writer.add_graph(net, image)
@@ -95,10 +97,7 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                 
             
            
-            #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
-            loss2 = bce_losses(pred, mask) 
-
-            loss = loss2 + loss1
+            loss = loss2 + 0.0001*loss1
             # backward
             optimizer.zero_grad()
             loss.backward()

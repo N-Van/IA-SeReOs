@@ -38,14 +38,11 @@ def dice_loss(pred, target, smooth=1.0, if_mean=True):
 class DomainEnrichLoss():
 
     def __init__(self):
-        #self.loss = nn.CrossEntropyLoss()
-        self.alpha = torch.from_numpy(np.asarray(1e0)).float()
-        self.beta = torch.from_numpy(np.asarray(1e0)).float()
-        self.gamma = torch.from_numpy(np.asarray(1e0)).float()
-        self.sigma = torch.from_numpy(np.asarray(1e0)).float()
-        self.zeta = torch.from_numpy(np.asarray(1e0)).float()
-        self.lambda1 = 0.0001*0.0001
-        self.lambda2 = 0.0001*0.0001
+        self.loss = nn.CrossEntropyLoss()
+        self.alpha = torch.from_numpy(np.asarray(1e6)).float()
+        self.beta = torch.from_numpy(np.asarray(1e6)).float()
+        self.sigma1 = torch.from_numpy(np.asarray(1e6)).float()
+        self.sigma2 = torch.from_numpy(np.asarray(1e6)).float()
 
     def __call__(self, net, ratio):
 
@@ -60,22 +57,19 @@ class DomainEnrichLoss():
         if rdn1_bone.is_cuda:
             self.alpha = self.alpha.cuda()
             self.beta = self.beta.cuda()
-            self.sigma = self.sigma.cuda()
-            self.gamma = self.gamma.cuda()
-            self.zeta = self.zeta.cuda()
+            self.sigma1 = self.sigma1.cuda()
+            self.sigma2 = self.sigma2.cuda()
 
-        rdn1_bone_norm2 = torch.norm(rdn1_bone,p=2)
-        rdn1_dirt_norm2 = torch.norm(rdn1_dirt,p=2)
+        rdn1_bone_norm = torch.norm(rdn1_bone)/get_size_of_tensor(rdn1_bone)
+        rdn1_dirt_norm = torch.norm(rdn1_dirt)/get_size_of_tensor(rdn1_dirt)
 
-        rdn2_bone_norm2 = torch.norm(rdn2_bone,p=2)
-        rdn2_dirt_norm2 = torch.norm(rdn2_dirt,p=2)
+        rdn2_bone_norm = torch.norm(rdn2_bone)/get_size_of_tensor(rdn2_bone)
+        rdn2_dirt_norm = torch.norm(rdn2_dirt)/get_size_of_tensor(rdn2_dirt)
 
-        rdn2_dirt_norm1 = torch.norm(rdn2_dirt,p=1)
+        LDF_bone = - (self.alpha * rdn1_bone_norm) + (self.beta * rdn1_dirt_norm)
+        LDF_dirt = (self.sigma1 * rdn2_bone_norm) - (self.sigma1 * rdn2_dirt_norm)
 
-        LDF_bone = - (self.alpha * rdn1_bone_norm2**2) + (self.beta * rdn1_dirt_norm2**2)
-        LDF_dirt = (self.gamma * rdn2_bone_norm2**2) - (self.sigma * rdn2_dirt_norm2**2) + (self.zeta * rdn2_dirt_norm1)
-
-        return torch.sigmoid(self.lambda1*LDF_bone + self.lambda2*LDF_dirt)
+        return LDF_bone + LDF_dirt
 
 class DiceOverlap():
 
