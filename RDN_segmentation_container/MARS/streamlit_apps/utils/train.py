@@ -166,5 +166,8 @@ def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):
     # print message
     if i_epoch is not None:
         print(f"Epoch: {i_epoch + 1}, Accuracy Value: {criterion_value:.6f}")
-
+        writer = SummaryWriter("runs")
+        writer.add_scalars('Dice Overlap',{'Air':dice_overlap_results[0],'Dirt':dice_overlap_results[1],'Bone':dice_overlap_results[2]}, i_epoch)
+        writer.add_scalars('Accuracy',criterion_value, i_epoch)
+        writer.close()
     return criterion_value, dice_overlap_results
