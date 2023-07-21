@@ -939,7 +939,7 @@ def main():
 
                         # Domain enrich patches
                         # Makes a decision about the lowest percent dirt that can be considered for the training.
-                        new_patches = random_patches(dirt_choose_threshold=0.1, dirt_rate=dirt_rate,
+                        new_patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=dirt_rate,
                                                     patches=train_patches, ratios=ratios)
 
                         rdn_patches, index = get_dirt_bone_patches(train_patches, ratios)
@@ -1869,7 +1869,7 @@ def rescale_label_proper(input_image, input_file_name: str):
 def rescale_intensity(inputFilename: str, writeOut: bool=True, file_type: str="", outDir: Union[str, pathlib.Path]=""):
     """
     Load in a 2d image file and rescale for data augmentation.
-    :param inputFilename: Name of file to be resclaed. Can be anything that SimpleITK reads.
+    :param inputFilename: Name of file to be rescaled. Can be anything that SimpleITK reads.
     :return: Returns a rescaled tif image.
     @rtype: object
     """
