@@ -44,8 +44,8 @@ class DomainEnrichLoss():
         self.gamma = torch.from_numpy(np.asarray(1e0)).float()
         self.sigma = torch.from_numpy(np.asarray(1e0)).float()
         self.zeta = torch.from_numpy(np.asarray(1e0)).float()
-        self.lambda1 = 0.0001*0.0001
-        self.lambda2 = 0.0001*0.0001
+        self.lambda1 = 1e-8
+        self.lambda2 = 1e-8
 
     def __call__(self, net, ratio):
 

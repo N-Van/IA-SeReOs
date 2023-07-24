@@ -94,9 +94,12 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
            
-            m = nn.Softmax(dim=3)
-            loss2 = nn.functional.cross_entropy(m(pred), mask)
 
+            #loss2 = nn.functional.cross_entropy(pred, mask)
+            # -(torch.nn.functional.log_softmax(pred, dim=1) * mask).sum(dim=1).mean()
+            # torch.nn.functional.cross_entropy(input=pred, target=mask)
+            ce_loss = nn.CrossEntropyLoss()
+            loss2 = ce_loss(pred, mask)
             loss = loss2 + loss1
             # backward
             optimizer.zero_grad() 
@@ -169,4 +172,4 @@ def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):
         writer.add_scalars('Dice Overlap',{'Air':dice_overlap_results[0],'Dirt':dice_overlap_results[1],'Bone':dice_overlap_results[2]}, i_epoch)
         writer.add_scalars('Accuracy',criterion_value, i_epoch)
         writer.close()
-    return criterion_value, dice_overlap_results
+        return criterion_value, dice_overlap_results

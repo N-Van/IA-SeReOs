@@ -197,7 +197,7 @@ def get_dirt_bone_patches(patches, ratios):
     return patches, d_index
 
 #Function that give a list of patches that contains dirt_rate percentage of dirt_patches (over dirt_choose_threshold ratio)
-def random_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
+def get_minimum_dirt_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
     # get ratios
     ratios = np.array(ratios)
     #get index that would sort ratios by decreasing order
