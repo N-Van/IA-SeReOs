@@ -939,7 +939,7 @@ def main():
 
                         # Domain enrich patches
                         # Makes a decision about the lowest percent dirt that can be considered for the training.
-                        new_patches = random_patches(dirt_choose_threshold=0.1, dirt_rate=dirt_rate,
+                        new_patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=dirt_rate,
                                                     patches=train_patches, ratios=ratios)
 
                         rdn_patches, index = get_dirt_bone_patches(train_patches, ratios)
