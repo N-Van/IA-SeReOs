@@ -86,9 +86,11 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     # print("image",image)
                     # print("mask",mask_img)
                     # print("pred",pred_img)
+                    writer = SummaryWriter("runs")
                     writer.add_image('input_image', torchvision.utils.make_grid(image),nb_ite + last_batches)
                     writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),nb_ite + last_batches)
                     writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
+                    writer.close()
                 
             
            
