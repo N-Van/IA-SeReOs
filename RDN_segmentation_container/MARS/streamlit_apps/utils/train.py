@@ -71,7 +71,7 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                 writer.add_graph(net, image)
                 writer.close()
             if tensorboard_plot and (ite % (max_batches1 // 3) == 0):
-                writer = SummaryWriter("runs")
+                
                 if epoch is not None:
                     with torch.no_grad():
                         pred2 = net(image)
@@ -91,9 +91,11 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     # print("image",image)
                     # print("mask",mask_img)
                     # print("pred",pred_img)
+                    writer = SummaryWriter("runs")
                     writer.add_image('input_image', torchvision.utils.make_grid(image),nb_ite + last_batches)
                     writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),nb_ite + last_batches)
                     writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
+                    writer.close()
                 
             
            
@@ -108,11 +110,13 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             pbar.set_postfix(loss=loss.cpu().data.numpy(),loss1=loss1.cpu().data.numpy(),loss2=loss2.cpu().data.numpy())
             loss1_sum = loss1_sum + loss1.cpu().data.numpy()
             loss2_sum = loss2_sum + loss2.cpu().data.numpy()
+            writer = SummaryWriter("runs")
             writer.add_scalars('Losses',{'loss':loss.cpu().data.numpy(),'loss1':loss1.cpu().data.numpy(),'loss2':loss2.cpu().data.numpy()}, nb_ite + last_batches)
             writer.add_scalars('Average_Losses',{'loss':(loss2_sum / (last_batches + 1)) + (loss1_sum / (last_batches + 1)),'loss1':(loss1_sum / (last_batches + 1)),'loss2':(loss2_sum / (last_batches + 1))}, nb_ite + last_batches)
+            writer.close()
             ite += 1
         print(f'\nAverage, loss1: {(loss1_sum / (last_batches + 1)):.6f}, loss2: {(loss2_sum/ (last_batches + 1)):.6f}.')
-        writer.close()
+        
     return nb_ite + last_batches
     ...
 
@@ -167,6 +171,5 @@ def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):
         print(f"Epoch: {i_epoch + 1}, Accuracy Value: {criterion_value:.6f}")
         writer = SummaryWriter("runs")
         writer.add_scalars('Dice Overlap',{'Air':dice_overlap_results[0],'Dirt':dice_overlap_results[1],'Bone':dice_overlap_results[2]}, i_epoch)
-        writer.add_scalars('Accuracy',criterion_value, i_epoch)
         writer.close()
     return criterion_value, dice_overlap_results
