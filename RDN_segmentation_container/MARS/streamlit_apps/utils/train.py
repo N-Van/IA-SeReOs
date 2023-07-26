@@ -66,7 +66,6 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                 writer.add_graph(net, image)
                 writer.close()
             if tensorboard_plot and (ite % (max_batches1 // 3) == 0):
-                writer = SummaryWriter("runs")
                 if epoch is not None:
                     with torch.no_grad():
                         pred2 = net(image)
@@ -109,11 +108,13 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             pbar.set_postfix(loss=loss.cpu().data.numpy(),loss2=loss2.cpu().data.numpy())
           
             loss2_sum = loss2_sum + loss2.cpu().data.numpy()
+            writer = SummaryWriter("runs")
             writer.add_scalars('Losses',{'loss':loss.cpu().data.numpy(),'loss2':loss2.cpu().data.numpy()}, nb_ite + last_batches)
             writer.add_scalars('Average_Losses',{'loss':(loss2_sum / (last_batches + 1)) + (loss1_sum / (last_batches + 1)),'loss2':(loss2_sum / (last_batches + 1))}, nb_ite + last_batches)
+            writer.close()
             ite += 1
         print(f'\nAverage, loss2: {(loss2_sum/ (last_batches + 1)):.6f}.')
-        writer.close()
+        
     return nb_ite + last_batches
     ...
 
