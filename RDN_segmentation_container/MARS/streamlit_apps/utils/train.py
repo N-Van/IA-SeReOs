@@ -89,9 +89,11 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     # print("image",image)
                     # print("mask",mask_img)
                     # print("pred",pred_img)
+                    writer = SummaryWriter("runs")
                     writer.add_image('input_image', torchvision.utils.make_grid(image),nb_ite + last_batches)
                     writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),nb_ite + last_batches)
                     writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
+                    writer.close()
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
            
 
@@ -170,6 +172,5 @@ def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):
         print(f"Epoch: {i_epoch + 1}, Accuracy Value: {criterion_value:.6f}")
         writer = SummaryWriter("runs")
         writer.add_scalars('Dice Overlap',{'Air':dice_overlap_results[0],'Dirt':dice_overlap_results[1],'Bone':dice_overlap_results[2]}, i_epoch)
-        writer.add_scalars('Accuracy',criterion_value, i_epoch)
         writer.close()
         return criterion_value, dice_overlap_results
