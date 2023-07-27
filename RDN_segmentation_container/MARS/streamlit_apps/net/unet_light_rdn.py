@@ -27,12 +27,11 @@ class UNet_Light_RDN(nn.Module):
         self.outc = OutConv(32, n_classes)
 
     def forward(self, x):
-
+        identity = x
         self.x_rdn1 = self.rdn1(x)
         self.x_rdn2 = self.rdn2(x)
-
         # self.x_rdn2 = self.rdn2(self.x_rdn1)
-        x1 = self.inc(torch.cat((self.x_rdn2 ,self.x_rdn1), 1))
+        x1 = self.inc(torch.cat((self.x_rdn2, self.x_rdn1, identity), 1))
 
         x2 = self.down1(x1)
         x3 = self.down2(x2)

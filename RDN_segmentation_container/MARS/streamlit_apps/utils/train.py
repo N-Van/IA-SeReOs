@@ -94,7 +94,8 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             
            
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
-            loss2 = bce_losses(pred, mask) 
+            CE_loss = nn.CrossEntropyLoss()
+            loss2 = CE_loss(pred, mask) 
 
             loss = loss2 + loss1
             # backward
