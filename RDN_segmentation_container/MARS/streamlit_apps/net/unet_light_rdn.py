@@ -15,7 +15,7 @@ class UNet_Light_RDN(nn.Module):
         self.rdn1 = DomainEnrich_Block(n_channels, 16)
         self.rdn2 = DomainEnrich_Block(n_channels, 16)
 
-        self.inc = DoubleConv(32, 32)
+        self.inc = DoubleConv(33, 32)
         self.down1 = Down(32, 64)
         self.down2 = Down(64, 128)
         self.down3 = Down(128, 256)
