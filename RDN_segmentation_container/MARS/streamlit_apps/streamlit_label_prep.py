@@ -462,7 +462,7 @@ def main():
                 if not state.unsegmented_training.joinpath(down_check).exists():
                     st.write(f"Downscaling {rescale}")
                     downscale_intensity(inputFilename=out_dir.joinpath(rescale),
-                                        downscale_value=75,
+                                        downscale_value=255,
                                         writeOut=True,
                                         file_type="tif",
                                         outDir=out_dir)
@@ -575,7 +575,6 @@ def main():
                 optimizer = "Adam"
                 learning_rate = previous_learning_rate
                 weight_decay = previous_weight_decay
-
             if st.button("Commit changes"):
                 state.data_path = data_path
                 if not data_path.exists():
@@ -689,9 +688,9 @@ def main():
                 else:
                     state.exclude_from_split = False
                     st.always_train = None
-
+            
             if st.button("Generate patches and validation data"):
-                output = 256
+                output =256
                 val_names = generate_patches_streamlit(hdf5_file=hdf5_name, patches_csv=patches_name,
                                                     validation_csv=val_name, train_ratio=train_size,
                                                     stride=stride, output_size=output, always_train_csv=False)
@@ -900,7 +899,7 @@ def main():
                     # May have to think of a fancy way to get an equivelant number with Adabelief, but it is being set
                     # to the default Adam period for now.
                     period = 8
-
+                
                 # create train transform
                 train_transform = transforms.Compose([dp.Augmentation(output_size=config['output_size']),
                                                     dp.AdjustMask(class_num=config['model']['class_num']),
@@ -929,26 +928,29 @@ def main():
                     for i_epoch in range(Epoch):
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
                         if i_epoch < period:
-                            dirt_rate = 0.5
+                            #dirt_rate = 0.5
+                            air_rate = 0.2
                         elif i_epoch < 2 * period and i_epoch >= period:
-                            dirt_rate = 0.3
+                            #dirt_rate = 0.3
+                            air_rate = 0.4
                         elif i_epoch < 3 * period and i_epoch >= 2 * period:
-                            dirt_rate = 0.1
+                            #dirt_rate = 0.1
+                            air_rate = 0.6
                         else:
-                            dirt_rate = 0.0
+                            #dirt_rate = 0.0
+                            air_rate = 0.8
 
-                        # Domain enrich patches
-                        # Makes a decision about the lowest percent dirt that can be considered for the training.
-                        new_patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=dirt_rate,
-                                                    patches=train_patches, ratios=ratios)
+                        #Get patches 
+                        patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=0,
+                                                   patches=train_patches, ratios=ratios)
 
-                        rdn_patches, index = get_dirt_bone_patches(train_patches, ratios)
+                        DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
-                        data_set1 = HDF52D(config['path']['data_path'], new_patches, val_patches,
+                        data_set = HDF52D(config['path']['data_path'], patches, val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform)
 
-                        data_set2 = HDF52D(config['path']['data_path'], rdn_patches, val_patches,
+                        DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform,
                                         train_idx=index)
@@ -957,18 +959,23 @@ def main():
 
                         current_batch = int(config['data_loader']['batch_size'])
 
+                        
+                        # train_data_loader.append(DataLoader(dataset=training_data_set,
+                        #                                     batch_size=current_batch,
+                        #                                     shuffle=True,
+                        #                                     num_workers=0))
 
-                        train_data_loader.append(DataLoader(dataset=data_set1,
+
+                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
                                                             batch_size=current_batch,
                                                             shuffle=True,
                                                             num_workers=0))
-
-
-                        train_data_loader.append(DataLoader(dataset=data_set2,
+                        
+                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
                                                             batch_size=current_batch,
                                                             shuffle=True,
                                                             num_workers=0))
-
+                        
                         print(f"learning rate {optimizer.param_groups[0]['lr']:.6f}")
 
                         nb_ite = rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
@@ -976,7 +983,7 @@ def main():
                         #lr_scheduler.step()
 
                         # validating
-                        val_loss, class_val = rdn_val(net, data_set1,
+                        val_loss, class_val = rdn_val(net, data_set,
                                                     use_gpu=config['gpu_config']['use_gpu'],
                                                     i_epoch=i_epoch,
                                                     class_num=config['model']['class_num'])
@@ -1930,7 +1937,7 @@ def rescale_intensity(inputFilename: str, writeOut: bool=True, file_type: str=""
     else:
         return rescaled
 
-def downscale_intensity(inputFilename, downscale_value=100, writeOut=True, file_type="", outDir=""):
+def downscale_intensity(inputFilename, downscale_value=30, writeOut=True, file_type="", outDir=""):
     """
     Load in a 2d image file and rescale for data augmentation.
     :param inputFilename: Name of file to be resclaed. Can be anything that SimpleITK reads.

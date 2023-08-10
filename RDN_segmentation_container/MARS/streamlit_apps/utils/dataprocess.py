@@ -95,18 +95,25 @@ class Augmentation(object):
 
     def __init__(self, output_size=256):
         self.aug = albu.Compose([
-            albu.HorizontalFlip(),
             albu.OneOf([
-            albu.RandomContrast(),
-            albu.RandomGamma(),
-            albu.RandomBrightness(),
-            ], p=0.5),
-            albu.OneOf([
-            albu.ElasticTransform(alpha=60, sigma=120 * 0.05, alpha_affine=120 * 0.03),
-            albu.GridDistortion(),
-            albu.OpticalDistortion(distort_limit=2, shift_limit=0.5),
-            ], p=0.5),
-            albu.ShiftScaleRotate(rotate_limit=180),
+                albu.HorizontalFlip(p=1),
+                albu.VerticalFlip(p=1),   
+                albu.Compose([
+                    albu.HorizontalFlip(p=1),
+                    albu.VerticalFlip(p=1), 
+                ])
+            ], p=0.75),
+            # albu.OneOf([
+            # albu.RandomContrast(),
+            # albu.RandomGamma(),
+            # albu.RandomBrightness(),
+            # ], p=0.5),
+            # albu.OneOf([
+            # albu.ElasticTransform(alpha=60, sigma=120 * 0.05, alpha_affine=120 * 0.03),
+            # albu.GridDistortion(),
+            # albu.OpticalDistortion(distort_limit=2, shift_limit=0.5),
+            # ], p=0.),5
+            albu.augmentations.geometric.rotate.RandomRotate90(p=1),
             albu.Resize(output_size, output_size, always_apply=True),
         ])
     def __call__(self,sample):

@@ -49,8 +49,13 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             
             image = sample_batched['image']
 
+            mask2 = sample_batched2['mask']
+
             image2 = sample_batched2['image']
-            index = sample_batched2['index']
+
+            index = sample_batched['index']
+            
+            index2 = sample_batched2['index']
 
             # convert to gpu
             if use_gpu:
@@ -59,10 +64,11 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                 image2 = image2.cuda()
 
             # # prediction
-            net(image2)
-            
-            loss1 = DomainEnrichLoss()(net, index)
             pred = net(image)
+            
+            loss1 = DomainEnrichLoss()(net, index, mask)
+            
+            
             mask = dp.create_one_hot(mask)
             if tensorboard_plot and nb_ite+ite == 0:
                 writer.add_graph(net, image)
@@ -89,10 +95,16 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     writer.add_image('input_image', torchvision.utils.make_grid(image),nb_ite + last_batches)
                     writer.add_image('prediction_image', torchvision.utils.make_grid(pred_img),nb_ite + last_batches)
                     writer.add_image('mask_image', torchvision.utils.make_grid(mask_img),nb_ite + last_batches)
-                    
-                
-            
-           
+                    output1 = np.concatenate(net.x_rdn1[0].cpu().data.numpy())
+                    for i in range(1,len(net.x_rdn1)):
+                        output1 = np.concatenate((output1,np.concatenate(net.x_rdn1[i].cpu().data.numpy())),axis=1)
+                    output2 = np.concatenate(net.x_rdn2[0].cpu().data.numpy())
+                    for i in range(1,len(net.x_rdn2)):
+                        output2 = np.concatenate((output2,np.concatenate(net.x_rdn2[i].cpu().data.numpy())),axis=1)
+
+                    writer.add_image('DEB_Bone_image', torchvision.utils.make_grid(torch.from_numpy(output1)), nb_ite + last_batches)
+                    writer.add_image('DEB_Dirt_image', torchvision.utils.make_grid(torch.from_numpy(output2)), nb_ite + last_batches)
+
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
             CE_loss = nn.CrossEntropyLoss()
             loss2 = CE_loss(pred, mask) 

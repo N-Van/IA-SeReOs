@@ -15,7 +15,7 @@ class UNet_Light_RDN(nn.Module):
         self.rdn1 = DomainEnrich_Block(n_channels, 16)
         self.rdn2 = DomainEnrich_Block(n_channels, 16)
 
-        self.inc = DoubleConv(32, 32)
+        self.inc = DoubleConv(33, 32)
         self.down1 = Down(32, 64)
         self.down2 = Down(64, 128)
         self.down3 = Down(128, 256)
@@ -27,12 +27,11 @@ class UNet_Light_RDN(nn.Module):
         self.outc = OutConv(32, n_classes)
 
     def forward(self, x):
-
+        identity = x
         self.x_rdn1 = self.rdn1(x)
         self.x_rdn2 = self.rdn2(x)
-
         # self.x_rdn2 = self.rdn2(self.x_rdn1)
-        x1 = self.inc(torch.cat((self.x_rdn2 ,self.x_rdn1), 1))
+        x1 = self.inc(torch.cat((self.x_rdn2, self.x_rdn1, identity), 1))
 
         x2 = self.down1(x1)
         x3 = self.down2(x2)

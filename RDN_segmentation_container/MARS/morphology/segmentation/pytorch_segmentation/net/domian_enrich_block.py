@@ -58,8 +58,10 @@ class DomainEnrich_Block(nn.Module):
         self.basic_block2 = BasicBlock(n_classes,n_classes)
 
     def forward(self, x):
+        
         x = self.basic_block1(x)
         x = self.basic_block2(x)
+        
         return x
 
 class RDN_Block(nn.Module):
