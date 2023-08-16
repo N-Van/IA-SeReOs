@@ -71,7 +71,7 @@ from MARS.morphology.segmentation.pytorch_segmentation.execute_3_class_seg impor
     _get_outDir,
     _get_inDir,
 )
-from MARS.morphology.segmentation.pytorch_segmentation.net.unet_light_rdn import (
+from MARS.streamlit_apps.net.unet_light_rdn import (
     UNet_Light_RDN,
 )
 

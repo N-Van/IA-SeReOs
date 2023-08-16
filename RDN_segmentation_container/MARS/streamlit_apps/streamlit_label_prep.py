@@ -299,17 +299,18 @@ def main():
             with st.spinner("Checking for file name consistency between training data and labels..."):
                 match_list = segmented_names
                 unsegmented_file_list = unsegmented_names
-
-                if len(match_list) != len(unsegmented_file_list):
-                    st.warning(f"!!! Found {len(match_list)} labels and {len(unsegmented_file_list)} unsegmeneted images !!!")
-                    st.info("This may be because the standardization step failed for some reason (unsupported file types),"
+                
+                
+                st.warning(f"!!! Found {len(match_list)} labels and {len(unsegmented_file_list)} unsegmented images !!!")
+                st.info("This may be because the standardization step failed for some reason (unsupported file types),"
                             " or the source folders didn't have the write images. Please check them and try again")
-
+                
                 match_list = [pathlib.Path(label_name).parts[-1] for label_name in match_list]
+                
                 unsegmented_file_list = [pathlib.Path(unseg_name).parts[-1] for unseg_name in unsegmented_file_list]
                 state.unsegmented_file_list = unsegmented_file_list
                 state.match_list = match_list
-
+               
                 #We only want to consider file names that don't have a match
                 match_list = [label_name for label_name in match_list if label_name not in unsegmented_file_list]
                 with names_col1:
@@ -319,11 +320,12 @@ def main():
                 with names_col2:
                     st.write("Label names:")
                     st.write(state.match_list)
-
+               
                 if match_list:
                     state.match_list = match_list
                     with st.expander("View/hide match information", expanded=False):
                         unmatched_labels = {}
+                        
                         for label_name in match_list:
                             if not state.unsegmented_training.joinpath(label_name).is_file():
                                 file_type_check = glob.glob(str(state.unsegmented_training.joinpath(label_name.rsplit(".")[0])))
@@ -690,7 +692,8 @@ def main():
                     st.always_train = None
             
             if st.button("Generate patches and validation data"):
-                output =256
+                output = 64
+               
                 val_names = generate_patches_streamlit(hdf5_file=hdf5_name, patches_csv=patches_name,
                                                     validation_csv=val_name, train_ratio=train_size,
                                                     stride=stride, output_size=output, always_train_csv=False)
@@ -901,7 +904,7 @@ def main():
                     period = 8
                 
                 # create train transform
-                train_transform = transforms.Compose([dp.Augmentation(output_size=config['output_size']),
+                train_transform = transforms.Compose([dp.Augmentation(output_size=64), #config['output_size']
                                                     dp.AdjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
@@ -929,16 +932,16 @@ def main():
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
                         if i_epoch < period:
                             #dirt_rate = 0.5
-                            air_rate = 0.2
+                            air_rate = 0.1
                         elif i_epoch < 2 * period and i_epoch >= period:
                             #dirt_rate = 0.3
-                            air_rate = 0.4
+                            air_rate = 0.2
                         elif i_epoch < 3 * period and i_epoch >= 2 * period:
                             #dirt_rate = 0.1
-                            air_rate = 0.6
+                            air_rate = 0.4
                         else:
                             #dirt_rate = 0.0
-                            air_rate = 0.8
+                            air_rate = 0.5
 
                         #Get patches 
                         patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=0,
@@ -1284,7 +1287,7 @@ def color_overlay(image, overlay_image, overlay_thresh=254, color=[100, 8, 58], 
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=1, n_classes=3)
+    net = UNet_Light_RDN(n_channels=8, n_classes=3)
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f'cuda:{int(cuda_index)}'))
     net.cuda()
@@ -1538,7 +1541,9 @@ def check_label_and_training_name(data_list: List, label_list: List, to_streamli
     # Then dset_name = [{'data': "XXX.png", 'label': "XXX_3_classes.png"}]
     data_set_names = []
     for idx in range(len(label_name)):
+        
         index_name = find_match_index(label_name[idx], data_name)
+       
         if index_name is not None:
             data_set_names.append({'data': data_list[index_name], 'label': label_list[idx]})
         else:

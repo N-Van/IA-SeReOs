@@ -54,8 +54,8 @@ class BasicBlock(nn.Module):
 class DomainEnrich_Block(nn.Module):
     def __init__(self, n_channels, n_classes):
         super().__init__()
-        self.basic_block1 = BasicBlock(n_channels,n_classes)
-        self.basic_block2 = BasicBlock(n_classes,n_classes)
+        self.basic_block1 = BasicBlock(n_channels, n_classes)
+        self.basic_block2 = BasicBlock(n_classes, n_classes)
 
     def forward(self, x):
         
@@ -67,7 +67,7 @@ class DomainEnrich_Block(nn.Module):
 class RDN_Block(nn.Module):
     def __init__(self, n_channels, n_classes):
         super().__init__()
-        self.rdn1 = DomainEnrich_Block(n_channels,n_classes)
+        self.rdn1 = DomainEnrich_Block(n_channels, n_classes)
         self.rdn2 = DomainEnrich_Block(n_channels, n_classes)
 
     def forward(self, x):

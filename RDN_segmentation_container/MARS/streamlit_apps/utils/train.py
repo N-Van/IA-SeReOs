@@ -67,7 +67,7 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             pred = net(image)
             
             loss1 = DomainEnrichLoss()(net, index, mask)
-            
+   
             
             mask = dp.create_one_hot(mask)
             if tensorboard_plot and nb_ite+ite == 0:
