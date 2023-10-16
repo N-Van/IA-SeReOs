@@ -1,0 +1,14 @@
+name: IA-SeReOs_env
+channels:
+  - defaults
+  - conda-forge
+  - anaconda
+  - nvidia
+  - pytorch
+dependencies:
+  - conda=23.5.0
+  - python=3.10.9
+  - pip=22.3.1
+  - streamlit=1.23.1
+  - pywavelets
+  - cudnn

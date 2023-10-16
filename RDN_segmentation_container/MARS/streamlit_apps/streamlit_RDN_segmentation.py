@@ -22,6 +22,8 @@ python -m torch.utils.collect_env
 
 import os
 import io
+import getpass
+
 import cv2
 import sys
 import vtk
@@ -2050,17 +2052,17 @@ def _get_user():
     """
     # We can't always count on this being launchde from a C: on windows
     # So we get the current working directory, then if there are back slashes we grab the root drive letter.
-    current = pathlib.Path.cwd()
-    if "\\" in str(current):
-        windows_drive = str(current.parts[0])
-    pc = socket.gethostname()
-    user = [
-        os.environ["USERNAME"]
-        if str(windows_drive) in os.getcwd()
-        else os.environ["USER"]
-    ]
-    user = f"{user[0]}_{pc}"
-    return user
+    # current = pathlib.Path.cwd()
+    # if "\\" in str(current):
+    #     windows_drive = str(current.parts[0])
+    # pc = socket.gethostname()
+    # user = [
+    #     os.environ["USERNAME"]
+    #     if str(windows_drive) in os.getcwd()
+    #     else os.environ["USER"]
+    # ]
+    # user = f"{user[0]}_{pc}"
+    return getpass.getuser()
 
 
 def _get_file_name_from_list(image_files, suffix=""):
