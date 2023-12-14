@@ -14,3 +14,4 @@ runs2/
 *.pyc
 .ipynb_checkpoints/*.ipynb
 .ipynb_checkpoints/*.bat
+average_loss_run2/*
