@@ -79,6 +79,7 @@ class ToTensor(object):
         return sample
 
 class Normalize(object):
+    " normalize image from 0-255 to 0-1"
     def __init__(self, max=255.0, min=0.0, tg_max=1.0, tg_min=0.0):
         self.max = max
         self.min = min

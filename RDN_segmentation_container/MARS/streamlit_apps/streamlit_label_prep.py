@@ -1942,7 +1942,7 @@ def rescale_intensity(inputFilename: str, writeOut: bool=True, file_type: str=""
     else:
         return rescaled
 
-def downscale_intensity(inputFilename, downscale_value=30, writeOut=True, file_type="", outDir=""):
+def downscale_intensity(inputFilename, downscale_value=60, writeOut=True, file_type="", outDir=""): # downscale value
     """
     Load in a 2d image file and rescale for data augmentation.
     :param inputFilename: Name of file to be resclaed. Can be anything that SimpleITK reads.

@@ -1,7 +1,16 @@
 RDN_segmentation_container/Data/
 RDN_segmentation_container/RDN_pytorch
+RDN_segmentation_container/MARS/streamlit_apps/__pycache__/*.pyc
+RDN_segmentation_container/MARS/yaml/
+RDN_segmentation_container/MARS/Scripts/
+RDN_segmentation_container/MARS/streamlit_apps/net/__pycache__/
+RDN_segmentation_container/MARS/streamlit_apps/utils/__pycache__/
 *.exe
 Installation
 Training_IA-SeReOs.py
 runs/*
+runs1/
+runs2/
 *.pyc
+.ipynb_checkpoints/*.ipynb
+.ipynb_checkpoints/*.bat
