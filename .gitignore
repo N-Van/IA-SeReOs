@@ -15,3 +15,4 @@ runs2/
 .ipynb_checkpoints/*.ipynb
 .ipynb_checkpoints/*.bat
 average_loss_run2/*
+RDN_segmentation_container/MARS/streamlit_apps/saved_states/*

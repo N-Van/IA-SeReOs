@@ -1,2 +1,0 @@
-call RDN_pytorch\Scripts\activate.bat && conda activate pytorch
-streamlit run C:\Users\n.vanderesse\Desktop\STAGE_Nolan\Ressources\Logiciel\RDN_segmentation_container\MARS\streamlit_apps\streamlit_label_prep.py
