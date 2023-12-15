@@ -5,6 +5,7 @@ RDN_segmentation_container/MARS/yaml/
 RDN_segmentation_container/MARS/Scripts/
 RDN_segmentation_container/MARS/streamlit_apps/net/__pycache__/
 RDN_segmentation_container/MARS/streamlit_apps/utils/__pycache__/
+RDN_segmentation_container/MARS/yaml/
 *.exe
 Installation
 Training_IA-SeReOs.py
