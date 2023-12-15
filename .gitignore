@@ -11,6 +11,7 @@ Training_IA-SeReOs.py
 runs/*
 runs1/
 runs2/
+runs3/
 *.pyc
 .ipynb_checkpoints/*.ipynb
 .ipynb_checkpoints/*.bat

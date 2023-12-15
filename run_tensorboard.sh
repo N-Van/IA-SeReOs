@@ -1,1 +1,1 @@
-tensorboard --logdir=runs --port 6006
+tensorboard --logdir=runs3 --port 6006

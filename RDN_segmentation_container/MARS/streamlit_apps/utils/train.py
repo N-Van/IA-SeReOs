@@ -7,11 +7,14 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from utils.losses import DomainEnrichLoss, dice_loss, DiceOverlap, Accuracy
 import torchvision
+import os
+import datetime
 
 from torch.utils.tensorboard import SummaryWriter
 
 bce_losses = nn.BCEWithLogitsLoss()
 accuracy = Accuracy()
+runsdir = os.path.join("runs", datetime.datetime.now().strftime('%Y-%m-%d%H-%M-%S'))
 
 def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu = False, tensorboard_plot=False, nb_ite=0):
     if use_gpu:
@@ -37,7 +40,7 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
     loss1_sum = 0.0
     loss2_sum = 0.0
     ite = 0
-    writer = SummaryWriter("runs")
+    writer = SummaryWriter(runsdir)
     with tqdm(total=len(data_loader1.dataset), desc=epoch_print, unit=' batches') as pbar:
         for i_batches, sample_batched in enumerate(data_loader1):
             last_batches = i_batches
@@ -107,6 +110,8 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
                     writer.add_image('DEB_Dirt_image', torchvision.utils.make_grid(torch.from_numpy(output2)), nb_ite + last_batches)
 
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
+            
+            # set up weights for Cross Entropy loss (air,dirt,bone)
             weights = torch.Tensor([0,0.75,1]).cuda()
             CE_loss = nn.CrossEntropyLoss(weight=weights)
             # print(mask)
@@ -184,7 +189,7 @@ def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):
     # print message
     if i_epoch is not None:
         print(f"Epoch: {i_epoch + 1}, Accuracy Value: {criterion_value:.6f}")
-        writer = SummaryWriter("runs")
+        writer = SummaryWriter(runsdir)
         writer.add_scalars('Dice Overlap',{'Air':dice_overlap_results[0],'Dirt':dice_overlap_results[1],'Bone':dice_overlap_results[2]}, i_epoch)
         writer.close()
     return criterion_value, dice_overlap_results
