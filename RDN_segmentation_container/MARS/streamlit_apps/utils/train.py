@@ -112,14 +112,17 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
             #loss2 = 0.25 * bce_losses(pred, mask) + (1 - 0.25) * dice_loss(pred, mask)
             
             # set up weights for Cross Entropy loss (air,dirt,bone)
-            weights = torch.Tensor([0,0.75,1]).cuda()
-            CE_loss = nn.CrossEntropyLoss(weight=weights)
+            
+            #weights = torch.Tensor([0.25,0.5,1]).cuda()
+            #CE_loss = nn.CrossEntropyLoss(weight=weights)
+            CE_loss = nn.CrossEntropyLoss()
             # print(mask)
             loss2 = CE_loss(pred, mask) 
 
-            loss = loss2 
+            loss = loss1 + loss2 
             # backward
             optimizer.zero_grad()
+            # learn on the segmentation part and the DEB of the nn
             loss.backward()
             optimizer.step()
 
@@ -140,7 +143,7 @@ def rdn_train(net, optimizer, data_loader, epoch=None, total_epoch=None, use_gpu
     return nb_ite + last_batches
     ...
 
-def rdn_val(net, data_set, use_gpu = False, i_epoch = None, class_num = 3):
+def rdn_val(net, data_set, use_gpu = True, i_epoch = None, class_num = 3):
 
     dice_overlap = DiceOverlap(class_num)
     if use_gpu:

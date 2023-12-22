@@ -1,1 +1,1 @@
-tensorboard --logdir=runs/2023-12-1514-52-53 --port 6006
+tensorboard --logdir=runs/2023-12-2215-28-34 --port 6006
