@@ -5,3 +5,5 @@ Installation
 Training_IA-SeReOs.py
 runs/*
 *.pyc
+RDN_segmentation_container/MARS/morphology/segmentation/pytorch_segmentation/__pycache__/*
+RDN_segmentation_container/MARS/.ipynb_checkpoints/*
