@@ -5,6 +5,7 @@ import pathlib
 import pandas as pd
 from PIL import Image
 import getpass
+
 import streamlit as st
 
 def alpha_to_int(text):
@@ -96,12 +97,10 @@ def _get_user():
     #We can't always count on this being launchde from a C: on windows
     #So we get the current working directory, then if there are back slashes we grab the root drive letter.
     # current = pathlib.Path.cwd()
-    # print(str(current))
-    # if "/" in str(current):
+    # if "\\" in str(current):
     #     windows_drive = str(current.parts[0])
     # user = [os.environ["USERNAME"] if str(windows_drive) in os.getcwd() else os.environ["USER"]]
     return getpass.getuser()
-
 
 
 def custom_html(body):

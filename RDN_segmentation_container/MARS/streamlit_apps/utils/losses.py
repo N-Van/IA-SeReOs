@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import torch.nn as nn
-
 import torch.nn.functional as F
 
 class Accuracy():
@@ -44,18 +43,19 @@ class DomainEnrichLoss():
         self.gamma = torch.from_numpy(np.asarray(1e0)).float()
         self.sigma = torch.from_numpy(np.asarray(1e0)).float()
         self.zeta = torch.from_numpy(np.asarray(1e0)).float()
-        self.lambda1 = 0.0001*0.0001
-        self.lambda2 = 0.0001*0.0001
-
-    def __call__(self, net, ratio):
+        self.lambda1 = 0.0001
+        self.lambda2 = 0.0001
+        
+    
+    def __call__(self, net, ratio, mask):
 
         # bone
         idx_bone = ratio == 1
         idx_dirt = ratio == 0
-        rdn1_bone = net.x_rdn1[idx_bone, 0:8, :, :]
-        rdn1_dirt = net.x_rdn1[idx_dirt, 0:8, :, :]
-        rdn2_bone = net.x_rdn2[idx_bone, 0:8, :, :]
-        rdn2_dirt = net.x_rdn2[idx_dirt, 0:8, :, :]
+        rdn1_bone = net.x_rdn1[idx_bone, :, :, :]
+        rdn1_dirt = net.x_rdn1[idx_dirt, :, :, :]
+        rdn2_bone = net.x_rdn2[idx_bone, :, :, :]
+        rdn2_dirt = net.x_rdn2[idx_dirt, :, :, :]
 
         if rdn1_bone.is_cuda:
             self.alpha = self.alpha.cuda()
@@ -70,12 +70,24 @@ class DomainEnrichLoss():
         rdn2_bone_norm2 = torch.norm(rdn2_bone,p=2)
         rdn2_dirt_norm2 = torch.norm(rdn2_dirt,p=2)
 
-        rdn2_dirt_norm1 = torch.norm(rdn2_dirt,p=1)
+        #rdn2_dirt_norm1 = torch.norm(rdn2_dirt, p=1)
 
-        LDF_bone = - (self.alpha * rdn1_bone_norm2**2) + (self.beta * rdn1_dirt_norm2**2)
-        LDF_dirt = (self.gamma * rdn2_bone_norm2**2) - (self.sigma * rdn2_dirt_norm2**2) + (self.zeta * rdn2_dirt_norm1)
-
-        return torch.sigmoid(self.lambda1*LDF_bone + self.lambda2*LDF_dirt)
+        # sum1 = 0 
+        # sum2 = 0
+        # for i in range(len(mask)):
+        #     place = mask[i] == 0
+        #     sum11 = 0
+        #     sum22 = 0
+        #     for l in range(len(net.x_rdn1[i])):
+        #         sum11 += torch.norm(net.x_rdn1[i][l][place], p=2).item()
+        #         sum22 += torch.norm(net.x_rdn2[i][l][place], p=2).item()
+        #     sum1 += sum11 / len(net.x_rdn1[i])
+        #     sum2 += sum22 / len(net.x_rdn2[i])
+        # sum1 /= len(mask)
+        # sum2 /= len(mask)
+        LDF_bone = - (self.alpha * rdn1_bone_norm2) + (self.beta * rdn1_dirt_norm2)
+        LDF_dirt = (self.gamma * rdn2_bone_norm2) - (self.sigma * rdn2_dirt_norm2) #+ (self.zeta * rdn2_dirt_norm1)
+        return torch.sigmoid(self.lambda1*LDF_bone) + torch.sigmoid(self.lambda2*LDF_dirt) #+ torch.sigmoid(torch.tensor(sum1)*0.01) + torch.sigmoid(torch.tensor(sum2)*0.01)
 
 class DiceOverlap():
 

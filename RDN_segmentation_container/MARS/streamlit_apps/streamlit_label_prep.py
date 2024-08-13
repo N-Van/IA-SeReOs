@@ -299,17 +299,18 @@ def main():
             with st.spinner("Checking for file name consistency between training data and labels..."):
                 match_list = segmented_names
                 unsegmented_file_list = unsegmented_names
-
-                if len(match_list) != len(unsegmented_file_list):
-                    st.warning(f"!!! Found {len(match_list)} labels and {len(unsegmented_file_list)} unsegmeneted images !!!")
-                    st.info("This may be because the standardization step failed for some reason (unsupported file types),"
+                
+                
+                st.warning(f"!!! Found {len(match_list)} labels and {len(unsegmented_file_list)} unsegmented images !!!")
+                st.info("This may be because the standardization step failed for some reason (unsupported file types),"
                             " or the source folders didn't have the write images. Please check them and try again")
-
+                
                 match_list = [pathlib.Path(label_name).parts[-1] for label_name in match_list]
+                
                 unsegmented_file_list = [pathlib.Path(unseg_name).parts[-1] for unseg_name in unsegmented_file_list]
                 state.unsegmented_file_list = unsegmented_file_list
                 state.match_list = match_list
-
+               
                 #We only want to consider file names that don't have a match
                 match_list = [label_name for label_name in match_list if label_name not in unsegmented_file_list]
                 with names_col1:
@@ -319,11 +320,12 @@ def main():
                 with names_col2:
                     st.write("Label names:")
                     st.write(state.match_list)
-
+               
                 if match_list:
                     state.match_list = match_list
                     with st.expander("View/hide match information", expanded=False):
                         unmatched_labels = {}
+                        
                         for label_name in match_list:
                             if not state.unsegmented_training.joinpath(label_name).is_file():
                                 file_type_check = glob.glob(str(state.unsegmented_training.joinpath(label_name.rsplit(".")[0])))
@@ -462,7 +464,7 @@ def main():
                 if not state.unsegmented_training.joinpath(down_check).exists():
                     st.write(f"Downscaling {rescale}")
                     downscale_intensity(inputFilename=out_dir.joinpath(rescale),
-                                        downscale_value=75,
+                                        downscale_value=255,
                                         writeOut=True,
                                         file_type="tif",
                                         outDir=out_dir)
@@ -575,7 +577,6 @@ def main():
                 optimizer = "Adam"
                 learning_rate = previous_learning_rate
                 weight_decay = previous_weight_decay
-
             if st.button("Commit changes"):
                 state.data_path = data_path
                 if not data_path.exists():
@@ -689,9 +690,10 @@ def main():
                 else:
                     state.exclude_from_split = False
                     st.always_train = None
-
+            
             if st.button("Generate patches and validation data"):
-                output = 256
+                output = 64
+               
                 val_names = generate_patches_streamlit(hdf5_file=hdf5_name, patches_csv=patches_name,
                                                     validation_csv=val_name, train_ratio=train_size,
                                                     stride=stride, output_size=output, always_train_csv=False)
@@ -900,9 +902,9 @@ def main():
                     # May have to think of a fancy way to get an equivelant number with Adabelief, but it is being set
                     # to the default Adam period for now.
                     period = 8
-
+                
                 # create train transform
-                train_transform = transforms.Compose([dp.Augmentation(output_size=config['output_size']),
+                train_transform = transforms.Compose([dp.Augmentation(output_size=64), #config['output_size']
                                                     dp.AdjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
@@ -929,26 +931,29 @@ def main():
                     for i_epoch in range(Epoch):
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
                         if i_epoch < period:
-                            dirt_rate = 0.5
+                            #dirt_rate = 0.5
+                            air_rate = 0.1
                         elif i_epoch < 2 * period and i_epoch >= period:
-                            dirt_rate = 0.3
+                            #dirt_rate = 0.3
+                            air_rate = 0.2
                         elif i_epoch < 3 * period and i_epoch >= 2 * period:
-                            dirt_rate = 0.1
+                            #dirt_rate = 0.1
+                            air_rate = 0.4
                         else:
-                            dirt_rate = 0.0
+                            #dirt_rate = 0.0
+                            air_rate = 0.5
 
-                        # Domain enrich patches
-                        # Makes a decision about the lowest percent dirt that can be considered for the training.
-                        new_patches = random_patches(dirt_choose_threshold=0.1, dirt_rate=dirt_rate,
-                                                    patches=train_patches, ratios=ratios)
+                        #Get patches 
+                        patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=0,
+                                                   patches=train_patches, ratios=ratios)
 
-                        rdn_patches, index = get_dirt_bone_patches(train_patches, ratios)
+                        DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
-                        data_set1 = HDF52D(config['path']['data_path'], new_patches, val_patches,
+                        data_set = HDF52D(config['path']['data_path'], patches, val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform)
 
-                        data_set2 = HDF52D(config['path']['data_path'], rdn_patches, val_patches,
+                        DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform,
                                         train_idx=index)
@@ -957,18 +962,23 @@ def main():
 
                         current_batch = int(config['data_loader']['batch_size'])
 
+                        
+                        # train_data_loader.append(DataLoader(dataset=training_data_set,
+                        #                                     batch_size=current_batch,
+                        #                                     shuffle=True,
+                        #                                     num_workers=0))
 
-                        train_data_loader.append(DataLoader(dataset=data_set1,
+
+                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
                                                             batch_size=current_batch,
                                                             shuffle=True,
                                                             num_workers=0))
-
-
-                        train_data_loader.append(DataLoader(dataset=data_set2,
+                        
+                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
                                                             batch_size=current_batch,
                                                             shuffle=True,
                                                             num_workers=0))
-
+                        
                         print(f"learning rate {optimizer.param_groups[0]['lr']:.6f}")
 
                         nb_ite = rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
@@ -976,7 +986,7 @@ def main():
                         #lr_scheduler.step()
 
                         # validating
-                        val_loss, class_val = rdn_val(net, data_set1,
+                        val_loss, class_val = rdn_val(net, data_set,
                                                     use_gpu=config['gpu_config']['use_gpu'],
                                                     i_epoch=i_epoch,
                                                     class_num=config['model']['class_num'])
@@ -1277,7 +1287,7 @@ def color_overlay(image, overlay_image, overlay_thresh=254, color=[100, 8, 58], 
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=1, n_classes=3)
+    net = UNet_Light_RDN(n_channels=8, n_classes=3)
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f'cuda:{int(cuda_index)}'))
     net.cuda()
@@ -1531,7 +1541,9 @@ def check_label_and_training_name(data_list: List, label_list: List, to_streamli
     # Then dset_name = [{'data': "XXX.png", 'label': "XXX_3_classes.png"}]
     data_set_names = []
     for idx in range(len(label_name)):
+        
         index_name = find_match_index(label_name[idx], data_name)
+       
         if index_name is not None:
             data_set_names.append({'data': data_list[index_name], 'label': label_list[idx]})
         else:
@@ -1930,7 +1942,7 @@ def rescale_intensity(inputFilename: str, writeOut: bool=True, file_type: str=""
     else:
         return rescaled
 
-def downscale_intensity(inputFilename, downscale_value=100, writeOut=True, file_type="", outDir=""):
+def downscale_intensity(inputFilename, downscale_value=30, writeOut=True, file_type="", outDir=""):
     """
     Load in a 2d image file and rescale for data augmentation.
     :param inputFilename: Name of file to be resclaed. Can be anything that SimpleITK reads.

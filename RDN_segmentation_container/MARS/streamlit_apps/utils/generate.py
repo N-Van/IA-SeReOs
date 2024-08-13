@@ -29,7 +29,7 @@ def sep_string(string: str, target, n=2):
 
 def find_match_index(target: str, str_list: List):
     for idx in range(len(str_list)):
-        if re.match(target, str_list[idx]):
+        if target==str_list[idx]: #was "if re.match(target, str_list[idx]):" but not working 
             return idx
     return None
 
@@ -147,7 +147,7 @@ def generate_ratios(data_path, patches_path, class_num=3):
     return ratios
 
 #function that create a list of patches that have contains more bone than dirt (or more dirt than bone) and shuffled
-def get_dirt_bone_patches(patches, ratios):
+def get_dirt_bone_patches(patches, ratios, air_rate):
     #get ratios 
     ratios = np.array(ratios)
     #get indices that would sort ratios by decreasing order
@@ -161,17 +161,23 @@ def get_dirt_bone_patches(patches, ratios):
     #get ratios and patches sorted by decreasing dirt ratios 
     ratios_sort = ratios[dirt_idx, :]
     patches_sort = patches[dirt_idx, :]
-
+    
     dirt_patches = []
     bone_patches = []
-    #get patches that contains significant differencies between dirt and bone ratios (>0.1)
-    for idx in range(ratios_sort.shape[0]):
-        if (ratios_sort[idx, 1] - ratios_sort[idx, 2] > 0.1):
-            dirt_patches.append(patches_sort[idx, :].tolist())
-        elif (ratios_sort[idx, 2] - ratios_sort[idx, 1] > 0.1):
-            bone_patches.append(patches_sort[idx, :].tolist())
-        else:
-            pass
+    
+    while (len(dirt_patches) < 128 or len(bone_patches) < 128) and air_rate < 1: #in the case that we have not enough patches 
+        dirt_patches = []
+        bone_patches = []
+        #get patches that contains significant differences between dirt and bone ratios (>0.1)
+        for idx in range(ratios_sort.shape[0]):
+            if (ratios_sort[idx, 0] < air_rate):
+                if (ratios_sort[idx, 1] - ratios_sort[idx, 2] > 0.15):
+                    dirt_patches.append(patches_sort[idx, :].tolist())
+                elif (ratios_sort[idx, 2] - ratios_sort[idx, 1] > 0.15):
+                    bone_patches.append(patches_sort[idx, :].tolist())
+            else:
+                pass
+        air_rate += 0.1
 
     dirt_len = len(dirt_patches)
     bone_len = len(bone_patches)
@@ -181,6 +187,8 @@ def get_dirt_bone_patches(patches, ratios):
     
     dirt_patches = shuffle(dirt_patches)
     bone_patches = shuffle(bone_patches)
+
+ 
     
     print(f"There are {bone_len} bone and {dirt_len} dirt patches in the training data...")
 
@@ -193,11 +201,12 @@ def get_dirt_bone_patches(patches, ratios):
     patches, d_index = shuffle(patches, d_index)
     patches = [[name, int(top), int(left), int(h), int(w)] for [name, top, left, h, w] in patches]
     d_index = [int(idx) for idx in d_index]
-
+    
+    
     return patches, d_index
 
 #Function that give a list of patches that contains dirt_rate percentage of dirt_patches (over dirt_choose_threshold ratio)
-def random_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
+def get_minimum_dirt_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
     # get ratios
     ratios = np.array(ratios)
     #get index that would sort ratios by decreasing order

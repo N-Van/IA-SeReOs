@@ -1,0 +1,1 @@
+streamlit run RDN_segmentation_container/MARS/streamlit_apps/streamlit_label_prep.py
