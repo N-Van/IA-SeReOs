@@ -209,7 +209,7 @@ def get_dirt_bone_patches(patches, ratios, air_rate):
 def get_minimum_dirt_patches(dirt_choose_threshold: float, dirt_rate: float, patches: np.array, ratios:np.array):
     # get ratios
     ratios = np.array(ratios)
-    #get index that would sort ratios by decreasing order
+    # Each individual ratio sorted by decreasing order
     ratios_idx = np.argsort(-ratios, axis=0)
 
     # ratios dimension is n_patches x n_classes
@@ -223,21 +223,22 @@ def get_minimum_dirt_patches(dirt_choose_threshold: float, dirt_rate: float, pat
         if dirt_ratio < dirt_choose_threshold:
             last_idx = i
             break
-    
+    # WTF C'est vraiment merdique. Ca serait plus simple d'avoir les ratios dans le même tableau que les patches.
+
     #indexes of wanted dirt_patches
     dirt_patches_idx = dirt_idx[0:last_idx]
     #indexes of other patches
     rest_idx = dirt_idx[last_idx:-1]
 
-    
-    if not (dirt_rate == 0):
+    # WTF c'est quoi ces noms de variables ? dirt_rate, dirt_ratio, rest_num ?
+    if not (dirt_rate == 0): # On a sélectionné les patches dont le pourcentage de sédiment est supérieur à un seuil, puis on sélectionne un subset de ces patches : n'importe quoi
         rest_num = round(((last_idx - 1) / dirt_rate) * (1 - dirt_rate))
         if rest_num > rest_idx.shape[0]:
             rest_num = rest_idx.shape[0]
     else:
         rest_num = rest_idx.shape[0]
     
-    #Getting picking other patches
+    #Getting picking other patches np.random.choice : Generates a random sample from a given 1-D array
     random_idx = np.random.choice(rest_idx.shape[0], size=rest_num, replace=False)
     non_dirt_patches_idx = rest_idx[random_idx]
 
@@ -245,6 +246,7 @@ def get_minimum_dirt_patches(dirt_choose_threshold: float, dirt_rate: float, pat
     patches_idx = np.concatenate((dirt_patches_idx, non_dirt_patches_idx), axis=0)
     new_patches = np.asarray(patches)[patches_idx, :].tolist()
 
-    new_patches = shuffle(new_patches)
+    new_patches = shuffle(new_patches) # WTF!!! On a fait un classement et au final on mélange tout !!!
     new_patches = [[name, int(top), int(left), int(h), int(w)] for [name, top, left, h, w] in new_patches]
+
     return new_patches

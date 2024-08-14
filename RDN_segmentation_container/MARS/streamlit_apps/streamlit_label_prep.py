@@ -880,7 +880,7 @@ def main():
                     yaml.dump(config, file)
 
                 # get training Epoch
-                Epoch = config['train_param']['Epoch']
+                Epoch = config['train_param']['Epoch'] # WTF le nom de variable
 
                 # load patches and ratios
                 train_patches = load_patches(config['csv_path']['train'])
@@ -890,10 +890,10 @@ def main():
                 if period == None: # WTF. Si period = None, une exception et puis c'est tout.
                     # This gets used later to ramp up the amount of non-bone that is being thrown into the training.
                     # May have to think of a fancy way to get an equivelant number with Adabelief, but it is being set
-                    # to the default Adam period for now.
+                    # to the default Adam period for now. # Who's talking?
                     period = 8
                 
-                # create train transform # WTF! Apres toutes les manips d'avant on decide ici que outpsize = 64
+                # create train transform # WTF! Apres toutes les manips d'avant on decide ici que outpsize = 64 !
                 train_transform = transforms.Compose([dp.Augmentation(output_size=64), #config['output_size']
                                                     dp.AdjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
@@ -918,7 +918,7 @@ def main():
                     iteration = 0
                     nb_ite = 0
                     #subprocess.call('echo "TensorBoard available, run this command to enable it : tensorboard --logdir=runs"', shell=True)
-                    for i_epoch in range(Epoch):
+                    for i_epoch in range(Epoch): # WTF c'etait trop compliqué d'écrire une fonction air_rate = f(i_epoch, period) ?
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
                         if i_epoch < period:
                             #dirt_rate = 0.5
