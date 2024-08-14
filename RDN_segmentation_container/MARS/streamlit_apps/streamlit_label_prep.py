@@ -7,7 +7,6 @@ import cv2
 script_dir = pathlib.Path(os.path.dirname(os.path.realpath(__file__))).parent
 sys.path.append(str(script_dir))
 sys.path.append('../../RDN_pytorch/Lib/site_packages/streamlit')
-import csv
 import glob
 import h5py
 import math
@@ -16,12 +15,9 @@ import json
 import yaml
 import torch
 import base64
-import random
 import shutil
 import pickle
-import socket
 import difflib
-import platform
 import subprocess
 import numpy as np
 
@@ -29,8 +25,6 @@ import pandas as pd
 import streamlit as st
 import SimpleITK as sitk
 import concurrent.futures
-import torch.nn as nn
-import torch.nn.functional as F
 import time
 from PIL import Image, ImageColor
 from torch import optim
@@ -44,11 +38,10 @@ from datetime import datetime, timedelta
 from timeit import default_timer as timer
 from streamlit.runtime.legacy_caching.hashing import _CodeHasher
 from random import shuffle as rand_shuffle
-from streamlit.web.server import Server
 from sklearn.utils import shuffle as sk_shuffle
 
 from streamlit_apps.streamlit_utils import _get_user
-from streamlit.runtime.scriptrunner import get_script_run_ctx, add_script_run_ctx
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 from streamlit import runtime
 #This package
 import utils.dataprocess as dp
@@ -59,11 +52,8 @@ from utils.label_utils import _check_label
 from streamlit_apps.streamlit_utils import *
 from utils.train import rdn_train, rdn_val
 from utils.dataset import HDF52D, load_patches, natural_keys
-from utils.losses import DomainEnrichLoss, dice_loss, DiceOverlap, Accuracy
 
-import torchvision
 
-from torch.utils.tensorboard import SummaryWriter
 
 #To easily adjust drop down menus
 supported_file_types = ["mhd", "nii", "tif", "png", "jpg", "bmp", "dcm"]
@@ -669,7 +659,7 @@ def main():
             st.info(f"Training data directory: {training_data_dir}")
             st.info(f"Training label directory: {training_label_dir}")
             st.info(f"Training label directory: {hdf5_name}")
-            ("---")
+            ("---") # WTF
 
             if st.button("Generate HDF5 dataset"):
                 generate_hdf5_streamlit(data_dir=state.unsegmented_training,
@@ -727,7 +717,7 @@ def main():
                     else:
                         ratios = generate_ratios_streamlit(hdf5_file=hdf5_name, patches_csv=patches_name,
                                                         class_num=class_num)
-                        new_ratios = pd.DataFrame(ratios)
+                        new_ratios = pd.DataFrame(ratios) # WTF ! Why "new" ratios ?
                         ratio_headers = [f"Class {idx}" for idx in range(class_num)] #Just in case we do increase class numbers
                         new_ratios.columns = ratio_headers
 
@@ -786,7 +776,7 @@ def main():
 
                 #Data path
                 train_data = config["path"]["data_path"]
-                model_output = config["path"]["save_path"]
+                model_output = config["path"]["save_path"] # WTF
 
                 #CSV path
                 patch_csv = config["csv_path"]["train"]
@@ -895,15 +885,15 @@ def main():
                 # load patches and ratios
                 train_patches = load_patches(config['csv_path']['train'])
                 val_patches = load_patches(config['csv_path']['val'])
-                ratios = load_patches(config['csv_path']['ratios'])
+                ratios = load_patches(config['csv_path']['ratios']) # WTF On charge les ratios avec la meme fonction que les patches. 
                 period = config['period']
-                if period == None:
+                if period == None: # WTF. Si period = None, une exception et puis c'est tout.
                     # This gets used later to ramp up the amount of non-bone that is being thrown into the training.
                     # May have to think of a fancy way to get an equivelant number with Adabelief, but it is being set
                     # to the default Adam period for now.
                     period = 8
                 
-                # create train transform
+                # create train transform # WTF! Apres toutes les manips d'avant on decide ici que outpsize = 64
                 train_transform = transforms.Compose([dp.Augmentation(output_size=64), #config['output_size']
                                                     dp.AdjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
@@ -943,10 +933,10 @@ def main():
                             #dirt_rate = 0.0
                             air_rate = 0.5
 
-                        #Get patches 
+                        #Get patches # WTF le nom. patches designe en fait un subset de train_patches
                         patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=0,
-                                                   patches=train_patches, ratios=ratios)
-
+                                                   patches=train_patches, ratios=ratios) # WTF. Apparamment c'est le seul endroit ou dirt_choose_threshold est defini
+                        # WTF le nom. DEB_patches designe en fait un subset de train_patches
                         DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
                         data_set = HDF52D(config['path']['data_path'], patches, val_patches,
@@ -1588,7 +1578,7 @@ def generate_patches_streamlit(hdf5_file : Union[str, pathlib.Path], patches_csv
 
     #Get the information for the validation data
     with h5py.File(hdf5_file, 'r') as data_f:
-        val = [[name, '0', '0', data_f[name]['label'][()].shape[0], data_f[name]['label'][()].shape[1]] for name in val_names]
+        val = [[name, '0', '0', data_f[name]['label'][()].shape[0], data_f[name]['label'][()].shape[1]] for name in val_names] # WTF !!!
 
     #Write patches and validation to a csv
     df_headers = ['name', 'top', 'left', 'h', 'w']
@@ -1627,7 +1617,7 @@ def generate_patches(hdf5_file : Union[str, pathlib.Path], patches_csv: Union[st
 
     #Get the information for the validation data
     with h5py.File(hdf5_file, 'r') as data_f:
-        val = [[name, '0', '0', data_f[name]['label'][()].shape[0], data_f[name]['label'][()].shape[1]] for name in val_names]
+        val = [[name, '0', '0', data_f[name]['label'][()].shape[0], data_f[name]['label'][()].shape[1]] for name in val_names] # WTF !!!
 
     #Write patches and validation to a csv
     df_headers = ['name', 'top', 'left', 'h', 'w']
@@ -1679,11 +1669,11 @@ def generate_ratios_streamlit(hdf5_file: Union[str, pathlib.Path], patches_csv: 
         img_count = 0
         for [name, top, left, h, w] in patches:
             mask = data_file[name]['label'][top: top+h, left: left+w]
-            mask = dp.adjustMask(mask, class_num)
+            mask = dp.adjustMask(mask, class_num) # WTF ! Pourquoi calculer ça sur chaque patch plutôt que le faire au début pour toutes images ?
 
             size = 1.0
             for idx in range(len(mask.shape)):
-                size *= mask.shape[idx]
+                size *= mask.shape[idx] # WTF !!! Y a pas un moyen plus simple calculer la taille d'un tableau ? Surtout que adjust mask est calculé seulement sur un tableau 2D
 
             ratio = [(np.sum(mask == idx)/size) for idx in range(class_num)]
             ratios.append(ratio)

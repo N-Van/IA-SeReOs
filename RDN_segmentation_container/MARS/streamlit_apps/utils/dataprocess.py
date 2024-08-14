@@ -34,7 +34,7 @@ def adjustMask(mask, class_num):
         new_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.longlong)
         for i in range(class_num):
             if i <= class_num - 2:
-                new_mask[(mask >= i*interval) & (mask < (i+1) * interval)] = i
+                new_mask[(mask >= i*interval) & (mask < (i+1) * interval)] = i # WTF !!!
             else:
                 new_mask[i*interval <= mask] = i
         return new_mask
