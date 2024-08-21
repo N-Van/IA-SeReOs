@@ -47,6 +47,7 @@ import matplotlib.pyplot as plt
 from pandas.core.common import flatten
 from PIL import Image, ImageColor
 from timeit import default_timer as timer
+from utils.dataset import get_neighbor_paths, load_2_5D_image
 
 
 
@@ -577,7 +578,7 @@ def page_segmentations(state):
     segmentation_state_values(state)
 
     if st.button("Load model!") and state.model != None and state.use_gpu != None:
-        state.net = UNet_Light_RDN(n_channels=1, n_classes=3)
+        state.net = UNet_Light_RDN(n_channels=3, n_classes=3)
         # Load in the trained model
         state.net.load_state_dict(
             torch.load(state.model, map_location=f"cuda:{state.use_gpu}")
@@ -843,7 +844,7 @@ def page_batch_segmentations(state):
         )
         st.write("---")
         if st.button("Load model!"):
-            state.net = UNet_Light_RDN(n_channels=1, n_classes=3)
+            state.net = UNet_Light_RDN(n_channels=3, n_classes=3)
             # Load in the trained model
             state.net.load_state_dict(
                 torch.load(state.model, map_location=f"cuda:{state.use_gpu}")
@@ -2389,7 +2390,7 @@ def gpu_selector(num_gpus):
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=1, n_classes=3)
+    net = UNet_Light_RDN(n_channels=3, n_classes=3)
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f"cuda:{int(cuda_index)}"))
     net.cuda()
@@ -3573,23 +3574,25 @@ def color_overlay(
 #####
 
 
-def three_class_segmentation(input_image, outDir, outType, network=""):
+def three_class_segmentation(input_image, outDir, outType, network="", n_channels=3, step=1):
     """
-    Function to segment a directory of 2d images using a pytorch model
+    Function to segment a directory of 2.5D images using a pytorch model.
     Images must be in a SimpleITK readable format (e.g. "tif", "png", "jpg", "bmp", "mhd", "nii", etc.)
     :param input_image: A list of images to be segmented.
     :param outDir: The output directory. If this doesn't exist it will be created.
-    :param outType: The output file type. Supported type are tif, png, jpg, and bmp.
+    :param outType: The output file type. Supported types are tif, png, jpg, and bmp.
     :param network: The pytorch network to be used for the segmentation.
-    :return: Returns a segmented 2d image with grey values representing air, dirt, and bone.
+    :param n_channels: Number of slices to consider in the 2.5D stack (must be odd).
+    :param step: Step size between slices in the stack.
+    :return: Returns a segmented 2D image with grey values representing air, dirt, and bone.
     """
     start = timer()
     save_folder = outDir
 
     net = network
 
-    # The file types that can be output along with the corresponding dictionary
-    if pathlib.Path(outDir).exists() != True:
+    # Ensure output directory exists
+    if not pathlib.Path(outDir).exists():
         pathlib.Path.mkdir(save_folder)
 
     # Get a list of files from the input folder using a list comprehension approach, then sort them numerically.
@@ -3599,6 +3602,7 @@ def three_class_segmentation(input_image, outDir, outType, network=""):
     st.write(f"Processing {len(image_names)} images...")
 
     progress_bar = st.progress(0)
+    
     # Loop through the images in the folder and use the image name for the output name
     for i in range(len(image_names)):
         image_name = image_names[i]
@@ -3609,38 +3613,36 @@ def three_class_segmentation(input_image, outDir, outType, network=""):
         if "." in out_name:
             out_name = out_name.rsplit(".", 1)[0]
 
-        # Read the image in with pillow and set it as a numpy array for pytorch
-        image = sitk.ReadImage(str(image_name))
-        # Check if the image is a vector and extract the first component, if so.
-        if image.GetPixelID() == 13:
-            image = sitk.VectorIndexSelectionCast(image, 0)
+        # Calculate the index from the filename
+        image_index = int(out_name.split('_')[-1])  # Assumes filename format like "deux_0801.tif"
+        directory = pathlib.Path(image_name).parent  # The directory where the images are stored
 
-        # Rescale the image to 8 bit if it isn't already
-        if image.GetPixelID() != 1:
-            image = sitk.Cast(sitk.RescaleIntensity(image), sitk.sitkUInt8)
+        # Get neighboring paths
+        neighbors = get_neighbor_paths(image_index, str(directory), n_channels=n_channels, step=step)
 
-        image = _setup_sitk_image(image, direction="z")
-        st.write(image)
-        # Pass the numpy array to pytorch, convert to a float between 0-1,then copy into cuda memory for classifcation.
-        image = torch.from_numpy(image)
-        image = image.unsqueeze(0).float() / 255.0
-        image = image.cuda()
+        # Load the 2.5D image stack
+        image = load_2_5D_image(image_index, str(directory), n_channels=n_channels, step=step)
 
-        # Turn all the gradients to false and get the maximum predictors from the network
+        # Convert to PyTorch tensor, normalize, and move to GPU
+        image = torch.from_numpy(image).float() / 255.0
+        image = image.unsqueeze(0).cuda()  # Add batch dimension and move to GPU
+
+        # Turn off gradients and get the maximum predictors from the network
         with torch.no_grad():
             pred = net(image)
-        pred = pred.argmax(1)
-        pred = pred.cpu().squeeze().data.numpy()
-        st.write("line 2930")
-        # Pass the predictions to be saved using pillow
+        pred = pred.argmax(1).cpu().squeeze().numpy()
+
+        # Save the predictions using your custom function
         _save_predictors(
             pred=pred, save_folder=outDir, image_name=out_name, file_type=outType
         )
+
         iteration = np.floor((100 * ((i + 1) / len(image_names))))
         progress_bar.progress(int(iteration))
 
     st.write("\n\nSegmentations are done!\n\n")
     _end_timer(start_timer=start, message="Segmentations")
+
 
 
 def _save_predictors(pred, save_folder, image_name, file_type):

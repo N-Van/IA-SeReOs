@@ -15,9 +15,8 @@ class UNet_Light_RDN(nn.Module):
         self.rdn1 = DomainEnrich_Block(n_channels, 8)
         self.rdn2 = DomainEnrich_Block(n_channels, 8)
 
-        #self.inc = DoubleConv(17, 32)
-        
-        self.inc = DoubleConv(1, 32) #only unet
+        # Change this line to use n_channels instead of 1
+        self.inc = DoubleConv(n_channels, 32)  # Adjust to accept 3-channel input
         
         self.down1 = Down(32, 64)
         self.down2 = Down(64, 128)
@@ -30,14 +29,7 @@ class UNet_Light_RDN(nn.Module):
         self.outc = OutConv(32, n_classes)
 
     def forward(self, x):
-        # identity = x
-        # self.x_rdn1 = self.rdn1(x)
-        # self.x_rdn2 = self.rdn2(x)
-        # # self.x_rdn2 = self.rdn2(self.x_rdn1)
-        # x1 = self.inc(torch.cat((self.x_rdn2, self.x_rdn1, identity), 1))
-        
-        x1 = self.inc(x) #only unet
-        
+        x1 = self.inc(x)  # Now this will handle 3-channel input
         x2 = self.down1(x1)
         x3 = self.down2(x2)
         x4 = self.down3(x3)

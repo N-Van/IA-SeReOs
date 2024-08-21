@@ -54,7 +54,6 @@ from utils.train import rdn_train, rdn_val
 from utils.dataset import HDF52D, load_patches, natural_keys
 
 
-
 #To easily adjust drop down menus
 supported_file_types = ["mhd", "nii", "tif", "png", "jpg", "bmp", "dcm"]
 slice_types = ["tif", "png", "jpg", "jpeg", "bmp", "dcm"]
@@ -846,7 +845,7 @@ def main():
                 if config['gpu_config']['use_gpu']:
                     torch.cuda.set_device(config['gpu_config']['gpu_name'])  # '1','0'
 
-                net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'])
+                net = UNet_Light_RDN(n_channels=3, n_classes=config['model']['class_num'])
                 if state.train_from_previous:
                     if config['model']['path'] is not None:
                         if config['gpu_config']['use_gpu']:
@@ -895,10 +894,10 @@ def main():
                 
                 # create train transform # WTF! Apres toutes les manips d'avant on decide ici que outpsize = 64 !
                 train_transform = transforms.Compose([dp.Augmentation(output_size=64), #config['output_size']
-                                                    dp.AdjustMask(class_num=config['model']['class_num']),
+                                                    dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
-                val_transform = transforms.Compose([dp.AdjustMask(class_num=config['model']['class_num']),
+                val_transform = transforms.Compose([dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
                 # if st.button("Launch Tensorboard !"):
@@ -939,14 +938,21 @@ def main():
                         # WTF le nom. DEB_patches designe en fait un subset de train_patches
                         DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
-                        data_set = HDF52D(config['path']['data_path'], patches, val_patches,
+                        data_set = HDF52D(
+                                        data_path='D:/Donnees_pour_segmentation_RDN/data/deux_mini/data/dataset.hdf5',
+                                        train_patches=train_patches,
+                                        val_patches=val_patches,
                                         train_transform=train_transform,
-                                        val_transform=val_transform)
+                                        val_transform=val_transform,
+                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/deux_mini/Unseg/new_unseg'  # The directory containing .tif images
+                                        )
 
                         DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform,
-                                        train_idx=index)
+                                        train_idx=index,
+                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/deux_mini/Unseg/new_unseg'  # Add the correct image directory here
+                                        )
 
                         train_data_loader = []
 
@@ -1063,10 +1069,12 @@ def main():
 
                 # get nets' name list and sort by creation time
                 # create train transform
-                val_transform = transforms.Compose([dp.AdjustMask(class_num=config['model']['class_num']),
+                val_transform = transforms.Compose([dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
-                data_set = HDF52D(config['path']['data_path'], [], config['csv_path']['val'], val_transform=val_transform)
+                data_set = HDF52D(config['path']['data_path'], [], config['csv_path']['val'], val_transform=val_transform,
+                                  image_dir='D:/Donnees_pour_segmentation_RDN/data/deux_mini/Unseg/new_unseg'  # Add the correct image directory here
+                                  )
                 data_set.val()
 
                 progress_bar = st.progress(0)
@@ -1077,7 +1085,7 @@ def main():
                     model_path = model_validation_directory
 
                     # get model
-                    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'])
+                    net = UNet_Light_RDN(n_channels=3, n_classes=config['model']['class_num'])
                     if config['gpu_config']['use_gpu']:
                         net.load_state_dict(torch.load(val_model,
                                                     map_location=torch.device(type='cuda',
@@ -1277,7 +1285,7 @@ def color_overlay(image, overlay_image, overlay_thresh=254, color=[100, 8, 58], 
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=8, n_classes=3)
+    net = UNet_Light_RDN(n_channels=3, n_classes=3)
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f'cuda:{int(cuda_index)}'))
     net.cuda()
@@ -1669,7 +1677,10 @@ def generate_ratios_streamlit(hdf5_file: Union[str, pathlib.Path], patches_csv: 
         img_count = 0
         for [name, top, left, h, w] in patches:
             mask = data_file[name]['label'][top: top+h, left: left+w]
-            mask = dp.adjustMask(mask, class_num) # WTF ! Pourquoi calculer ça sur chaque patch plutôt que le faire au début pour toutes images ?
+            #mask = dp.adjustMask(mask, class_num) # WTF ! Pourquoi calculer ça sur chaque patch plutôt que le faire au début pour toutes images ?
+            adjust_mask_transform = dp.adjustMask(class_num)
+            adjusted_sample = adjust_mask_transform({'mask': mask})
+            mask = adjusted_sample['mask']
 
             size = 1.0
             for idx in range(len(mask.shape)):
