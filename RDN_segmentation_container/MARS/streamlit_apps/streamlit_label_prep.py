@@ -475,24 +475,24 @@ def main():
         # state.unsegmented_training is the directory with training data
         # state.segmented_training is the directory with label data
 
-        #Where we will write the hdf5, yaml config, and model iterations
-        if state.unsegmented_imgs!=None and state.segmented_imgs!=None:
+        # Where we will write the hdf5, yaml config, and model iterations
+        if state.unsegmented_imgs != None and state.segmented_imgs != None:
             data_path = state.unsegmented_training.parent.parent.joinpath("data")
             train_yaml = str(script_dir.joinpath("yaml").joinpath("train.yaml"))
             test_yaml = str(script_dir.joinpath("yaml").joinpath("test.yaml"))
             new_models_path = data_path.joinpath("new_model")
 
-            #Read in the default yaml information
+            # Read in the default yaml information
             train_yaml_file = read_train_yaml(yaml_file=train_yaml)
             test_yaml_file = read_train_yaml(yaml_file=test_yaml)
 
-            #Get the GPU device
+            # Get the GPU device
             device_num = initiate_cuda()
 
-            #Check if we can set the GPU and return various error messagges if we can't.
+            # Check if we can set the GPU and return various error messages if we can't.
             state.device_num = setup_gpu(device_num=device_num, state=state)
 
-            #Get the information for the user so they can see
+            # Get the information for the user so they can see
             cuda_mem = int(torch.cuda.get_device_properties(device=state.use_gpu).total_memory)
             cuda_mem = list(_convert_size(sizeBytes=cuda_mem))
 
@@ -507,20 +507,31 @@ def main():
                 st.info(f"Training data save path: {data_path}")
                 st.info(f"New models will be saved to: {new_models_path}")
 
-            #Grab the information from the default yamls.
+            # Grab the information from the default yamls.
             previous_batch = train_yaml_file["data_loader"]["batch_size"]
             previous_period = train_yaml_file["period"]
             previous_epoch = train_yaml_file["train_param"]["Epoch"]
             previous_learning_rate = train_yaml_file["optimizer"]["lr"]
             previous_weight_decay = train_yaml_file["optimizer"]["weight_decay"]
+            previous_n_channels = train_yaml_file["model"]["n_channels"]  # Extract n_channels
+            previous_step = train_yaml_file["model"]["step"]  # Extract step
 
-            #Columns for the standard settings
-            yaml_col_1, yaml_col_2, yaml_col_3, yaml_col_4 = st.columns([1, 1, 1, 2])
+            # Columns for the standard settings
+            yaml_col_1, yaml_col_2, yaml_col_3, yaml_col_4, yaml_col_5 = st.columns([1, 1, 1, 1, 1])  # Added another column
+
             with yaml_col_1:
                 batch_size = st.text_input("Input batch size (an integer):", f"{previous_batch}")
+
+            with yaml_col_2:
+                n_channels = st.text_input("Number of channels (e.g., 1 for grayscale, 3 for RGB):", f"{previous_n_channels}")
+
             with yaml_col_3:
-                epochs_num = st.text_input("Input epochs (an integer):", f"{previous_epoch}")
+                step = st.text_input("Step size for 2.5D (an integer):", f"{previous_step}")
+
             with yaml_col_4:
+                epochs_num = st.text_input("Input epochs (an integer):", f"{previous_epoch}")
+
+            with yaml_col_5:
                 if st.checkbox("Train from a previously trained model?"):
                     state.train_from_previous = True
                     previous_model = st.file_uploader("Select model", type=["pth"], accept_multiple_files=False)
@@ -531,13 +542,13 @@ def main():
                 else:
                     state.train_from_previous = False
 
-            #If there are additional optimizer settings then they go under advanced use
+            # If there are additional optimizer settings then they go under advanced use
             if st.checkbox("Advanced parameters"):
                 yaml2_col_1, yaml2_col_2, yaml2_col_3, yaml2_col_4 = st.columns([1, 1, 1, 1])
                 with yaml2_col_1:
                     optimizer = st.selectbox("Optimizer", supported_optimizers)
                 with yaml2_col_2:
-                    #Adam is the default, but any can be added to the list above and then settings can be passed over.
+                    # Adam is the default, but any can be added to the list above and then settings can be passed over.
                     if optimizer == "AdaBelief":
                         learning_rate = st.text_input("Optimizer learning rate", f"{1e-03:.8f}")
                         learning_rate = f"{float(learning_rate):.1e}"
@@ -566,6 +577,7 @@ def main():
                 optimizer = "Adam"
                 learning_rate = previous_learning_rate
                 weight_decay = previous_weight_decay
+
             if st.button("Commit changes"):
                 state.data_path = data_path
                 if not data_path.exists():
@@ -583,10 +595,10 @@ def main():
                     train_yaml_file["model"]["if_pre_train"] = "false"
                     train_yaml_file["model"]["path"] = None
 
-                #GPU device index
+                # GPU device index
                 train_yaml_file["gpu_config"]["gpu_name"] = int(state.use_gpu)
 
-                #Loops
+                # Loops
                 train_yaml_file["data_loader"]["batch_size"] = int(batch_size)
                 if period_size:
                     train_yaml_file["period"] = int(period_size)
@@ -594,7 +606,7 @@ def main():
                     train_yaml_file["period"] = None
                 train_yaml_file["train_param"]["Epoch"] = int(epochs_num)
 
-                #Optimizer paramters
+                # Optimizer parameters
                 train_yaml_file["optimizer"]["method"] = f'{optimizer}'
                 train_yaml_file["optimizer"]["lr"] = float(learning_rate)
                 if optimizer == "AdaBelief":
@@ -603,16 +615,20 @@ def main():
                 else:
                     train_yaml_file["optimizer"]["weight_decay"] = float(weight_decay)
 
-                #Data path
+                # Data path
                 train_yaml_file["path"]["data_path"] = str(data_path.joinpath("dataset.hdf5").as_posix())
                 train_yaml_file["path"]["save_path"] = str(new_models_path.as_posix())
 
-                #CSV path
+                # CSV path
                 train_yaml_file["csv_path"]["train"] = str(data_path.joinpath("patches.csv").as_posix())
                 train_yaml_file["csv_path"]["val"] = str(data_path.joinpath("val.csv").as_posix())
                 train_yaml_file["csv_path"]["ratios"] = str(data_path.joinpath("ratios.csv").as_posix())
 
-                #Test yaml
+                # Set the n_channels and step parameters in the YAML
+                train_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to YAML
+                train_yaml_file["model"]["step"] = int(step)  # Save the updated step to YAML
+
+                # Test YAML
                 test_yaml_file["gpu_config"]["gpu_name"] = int(state.use_gpu)
                 test_yaml_file["path"]["data_path"] = str(data_path.joinpath("dataset.hdf5").as_posix())
                 test_yaml_file["model"]["path"] = str(new_models_path.as_posix())
@@ -632,13 +648,15 @@ def main():
                 with open(str(new_test_yaml_name), 'w') as f:
                     yaml.dump(test_yaml_file, f)
                     state.new_test_yaml_name = new_test_yaml_name
+
                 st.info(f"Training and validation parameters written to {new_yaml_path}")
-        elif(state.unsegmented_imgs==None and state.segmented_imgs!=None):
+        elif state.unsegmented_imgs == None and state.segmented_imgs != None:
             st.warning(f"You need to put good unsegmented training data")
-        elif(state.unsegmented_imgs!=None and state.segmented_imgs==None):
+        elif state.unsegmented_imgs != None and state.segmented_imgs == None:
             st.warning(f"You need to put good segmented training data")
-        elif(state.unsegmented_imgs==None and state.segmented_imgs==None):
+        elif state.unsegmented_imgs == None and state.segmented_imgs == None:
             st.warning(f"You need to put good unsegmented and segmented training data")
+
 
     if model_settings_activity == "Finalize data":
         state = _get_state()
@@ -737,13 +755,13 @@ def main():
     if model_settings_activity == "Train model":
         if state.data_path in [None, "None", "."]:
             st.warning("Dataset path not defined. If you're looking to pick up where you left off, go back to "
-                       "Setting up training parameters.")
+                    "Setting up training parameters.")
         else:
             new_yaml_path = state.data_path.joinpath("yaml")
             new_train_yaml_name = new_yaml_path.joinpath("train.yaml")
             new_test_yaml_name = new_yaml_path.joinpath("test.yaml")
 
-            #Should probably move this up to the yaml section and put it into state
+            # Should probably move this up to the yaml section and put it into state
             timestamp = time.time()
             sub_save_file = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d_%H')
             config_col_1, config_col_2, config_col_3, config_col_4 = st.columns([1, 1, 1, 2])
@@ -752,10 +770,10 @@ def main():
                 with open(new_train_yaml_name) as file:
                     config = yaml.load(file, Loader=yaml.FullLoader)
 
-                #GPU device index
+                # GPU device index
                 gpu_ID = config["gpu_config"]["gpu_name"]
 
-                #Previous model
+                # Previous model
                 if config["model"]["if_pre_train"] == "true":
                     model_start = config["model"]["path"]
                     state.train_from_previous = True
@@ -763,24 +781,28 @@ def main():
                     model_start = False
                     state.train_from_previous = False
 
-                #Loops
+                # Loops
                 batch_size = config["data_loader"]["batch_size"]
                 periods = config["period"]
                 num_epochs = config["train_param"]["Epoch"]
 
-                #Optimizer paramters
+                # Optimizer parameters
                 optimize_method = config["optimizer"]["method"]
                 optimize_learning_rate = config["optimizer"]["lr"]
                 optimize_learning_weight = config["optimizer"]["weight_decay"]
 
-                #Data path
+                # Data path
                 train_data = config["path"]["data_path"]
-                model_output = config["path"]["save_path"] # WTF
+                model_output = config["path"]["save_path"]
 
-                #CSV path
+                # CSV path
                 patch_csv = config["csv_path"]["train"]
                 validation_csv = config["csv_path"]["val"]
                 ratio_csv = config["csv_path"]["ratios"]
+
+                # n_channels and step variables
+                n_channels = config["model"].get("n_channels", 1)  # Default to 1 if not found
+                step = config["model"].get("step", 1)  # Default to 1 if not found
 
                 with config_col_1:
                     st.header("Graphics card")
@@ -820,7 +842,6 @@ def main():
                     else:
                         st.error("Can't find validation csv! Did you generate it?")
 
-
                 model_save_path = pathlib.Path(config['path']['save_path'])
                 save_path = model_save_path.joinpath(sub_save_file)
                 state.save_path = save_path
@@ -829,15 +850,21 @@ def main():
                     st.info(f"Starting training from model {model_start}")
                 st.info(f"Models will be written to {save_path.as_posix()}")
 
+                # Display the n_channels and step variables
+                st.info(f"n_channels: {n_channels}")  # Display the n_channels
+                st.info(f"step: {step}")  # Display the step
 
-                #If the folders don't exist we make them
+                # If the folders don't exist we make them
                 if not model_save_path.exists():
-                    st. info(f"Making {model_save_path}")
+                    st.info(f"Making {model_save_path}")
                     model_save_path.mkdir()
 
                 if not save_path.exists():
                     st.info(f"Making {save_path}")
                     save_path.mkdir()
+
+
+
 
             # get model
             if st.checkbox("Intialize UNet"):
@@ -845,7 +872,7 @@ def main():
                 if config['gpu_config']['use_gpu']:
                     torch.cuda.set_device(config['gpu_config']['gpu_name'])  # '1','0'
 
-                net = UNet_Light_RDN(n_channels=3, n_classes=config['model']['class_num'])
+                net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'])
                 if state.train_from_previous:
                     if config['model']['path'] is not None:
                         if config['gpu_config']['use_gpu']:
@@ -939,19 +966,23 @@ def main():
                         DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
                         data_set = HDF52D(
-                                        data_path='D:/Donnees_pour_segmentation_RDN/data/deux_mini/data/dataset.hdf5',
+                                        data_path='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/data/dataset.hdf5',
                                         train_patches=train_patches,
                                         val_patches=val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform,
-                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/deux_mini/Unseg/new_unseg'  # The directory containing .tif images
+                                        n_channels=config['model']['n_channels'],
+                                        step=config['model']['step'],
+                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/Unseg/new_unseg'  # The directory containing .tif images
                                         )
 
                         DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform,
                                         train_idx=index,
-                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/deux_mini/Unseg/new_unseg'  # Add the correct image directory here
+                                        n_channels=config['model']['n_channels'],
+                                        step=config['model']['step'],
+                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/Unseg/new_unseg'  # Add the correct image directory here
                                         )
 
                         train_data_loader = []
@@ -1073,7 +1104,9 @@ def main():
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
                 data_set = HDF52D(config['path']['data_path'], [], config['csv_path']['val'], val_transform=val_transform,
-                                  image_dir='D:/Donnees_pour_segmentation_RDN/data/deux_mini/Unseg/new_unseg'  # Add the correct image directory here
+                                  n_channels=config['model']['n_channels'],
+                                  step=config['model']['step'],
+                                  image_dir='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/Unseg/new_unseg'  # Add the correct image directory here
                                   )
                 data_set.val()
 
@@ -1085,7 +1118,7 @@ def main():
                     model_path = model_validation_directory
 
                     # get model
-                    net = UNet_Light_RDN(n_channels=3, n_classes=config['model']['class_num'])
+                    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'])
                     if config['gpu_config']['use_gpu']:
                         net.load_state_dict(torch.load(val_model,
                                                     map_location=torch.device(type='cuda',
@@ -1285,7 +1318,7 @@ def color_overlay(image, overlay_image, overlay_thresh=254, color=[100, 8, 58], 
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=3, n_classes=3)
+    net = UNet_Light_RDN(n_channels=8, n_classes=3)
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f'cuda:{int(cuda_index)}'))
     net.cuda()
