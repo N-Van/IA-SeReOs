@@ -54,12 +54,16 @@ def load_patches(patches):
 def get_filename_prefix(directory):
     """
     Get the common prefix of the filenames in the directory.
+    Handles cases like 'os_long_0019.tif' and returns 'os_long'.
     """
     files = [f for f in os.listdir(directory) if f.endswith('.tif')]
     if not files:
         raise ValueError(f"No .tif files found in the directory: {directory}")
-    prefix = files[0].split('_')[0]  # Extract everything before the first underscore
+    
+    # Split the first file on the underscore and join all but the last part
+    prefix = '_'.join(files[0].split('_')[:-1])
     return prefix
+
 
 # Function to get the number of digits in the file names
 def get_num_digits(directory):
@@ -70,7 +74,7 @@ def get_num_digits(directory):
     return num_digits
 
 # Function to get the neighbor paths
-def get_neighbor_paths(image_index, directory, n_channels=3, step=1):
+def get_neighbor_paths(image_index, directory, n_channels, step):
     # Get the filename prefix
     filename_prefix = get_filename_prefix(directory)
     
@@ -119,13 +123,13 @@ def get_image_indices(directory, filename_prefix):
     return indices[0], indices[-1]
 
 
-def load_2_5D_image(image_index, directory, n_channels=3, step=1):
+def load_2_5D_image(image_index, directory, n_channels, step):
     if n_channels == 1:
         # Get the number of digits
         num_digits = get_num_digits(directory)
         
         # Load the single image directly
-        image_path = os.path.join(directory, f"deux_mini_{image_index:0{num_digits}d}.tif").replace("\\", "/")
+        image_path = os.path.join(directory, f"os_long_mini_{image_index:0{num_digits}d}.tif").replace("\\", "/")
         image = Image.open(image_path).convert('L')
         return np.expand_dims(np.array(image), axis=0)  # Return (1, H, W) image
 
@@ -137,7 +141,7 @@ def load_2_5D_image(image_index, directory, n_channels=3, step=1):
         return image_stack
 
 class HDF52D(Dataset):
-    def __init__(self, data_path, train_patches, val_patches, image_dir, train_transform=None, val_transform=None, train_idx=None, n_channels=3, step=1):
+    def __init__(self, data_path, train_patches, val_patches, image_dir, n_channels, step, train_transform=None, val_transform=None, train_idx=None):
         self.data_path = data_path
         self.image_dir = image_dir  # Directory where the .tif images are located
         self.patches = {
@@ -231,7 +235,7 @@ if __name__ == '__main__':
                                      dp.AdjustMask(class_num=3),
                                      dp.Normalize(max=255, min=0)])
 
-    data_set = HDF52D(data_path,train_patches,val_patches,train_transform=transforms, train_idx=ratios, n_channels=3, step=1)
+    data_set = HDF52D(data_path,train_patches,val_patches,train_transform=transforms, train_idx=ratios, n_channels=n_channels, step=step)
     sample = data_set[1000]
     mask = sample['mask']
 
