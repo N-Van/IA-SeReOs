@@ -51,7 +51,7 @@ from utils.label_utils import *
 from utils.label_utils import _check_label
 from streamlit_apps.streamlit_utils import *
 from utils.train import rdn_train, rdn_val
-from utils.dataset import HDF52D, load_patches, natural_keys
+from utils.dataset import HDF52D, load_patches, natural_keys, get_filename_prefix
 
 
 #To easily adjust drop down menus
@@ -209,7 +209,8 @@ def main():
                 label_dir = pathlib.Path(state.segmented_training)
                 st.write(f"Standardized unsegmented images will be written to {unseg_dir} as tif")
                 st.write(f"Standardized labels will be written to {label_dir} as tif")
-
+                # Store unseg_dir in state for later use
+                state.unseg_dir = unseg_dir
             if st.button("Standardize training data"):
                 unsegmented_imgs = state.unsegmented_imgs
                 segmented_imgs = state.segmented_imgs
@@ -973,7 +974,7 @@ def main():
                                         val_transform=val_transform,
                                         n_channels=config['model']['n_channels'],
                                         step=config['model']['step'],
-                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/Unseg/new_unseg'  # The directory containing .tif images
+                                        image_dir = str(state.unseg_dir).replace("\\", "/")   # The directory containing .tif images
                                         )
 
                         DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
@@ -982,7 +983,7 @@ def main():
                                         train_idx=index,
                                         n_channels=config['model']['n_channels'],
                                         step=config['model']['step'],
-                                        image_dir='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/Unseg/new_unseg'  # Add the correct image directory here
+                                        image_dir = str(state.unseg_dir).replace("\\", "/")   # Add the correct image directory here
                                         )
 
                         train_data_loader = []
@@ -1106,7 +1107,7 @@ def main():
                 data_set = HDF52D(config['path']['data_path'], [], config['csv_path']['val'], val_transform=val_transform,
                                   n_channels=config['model']['n_channels'],
                                   step=config['model']['step'],
-                                  image_dir='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/Unseg/new_unseg'  # Add the correct image directory here
+                                  image_dir = str(state.unseg_dir).replace("\\", "/")   # Add the correct image directory here
                                   )
                 data_set.val()
 
