@@ -629,7 +629,10 @@ def main():
                 train_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to YAML
                 train_yaml_file["model"]["step"] = int(step)  # Save the updated step to YAML
 
-                # Test YAML
+                # Test YAML - Set the n_channels and step
+                test_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to test YAML
+                test_yaml_file["model"]["step"] = int(step)  # Save the updated step to test YAML
+
                 test_yaml_file["gpu_config"]["gpu_name"] = int(state.use_gpu)
                 test_yaml_file["path"]["data_path"] = str(data_path.joinpath("dataset.hdf5").as_posix())
                 test_yaml_file["model"]["path"] = str(new_models_path.as_posix())
@@ -657,6 +660,7 @@ def main():
             st.warning(f"You need to put good segmented training data")
         elif state.unsegmented_imgs == None and state.segmented_imgs == None:
             st.warning(f"You need to put good unsegmented and segmented training data")
+
 
 
     if model_settings_activity == "Finalize data":
