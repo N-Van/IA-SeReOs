@@ -971,7 +971,7 @@ def main():
                         DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
                         data_set = HDF52D(
-                                        data_path='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/data/dataset.hdf5',
+                                        data_path=config['path']['data_path'],
                                         train_patches=train_patches,
                                         val_patches=val_patches,
                                         train_transform=train_transform,
