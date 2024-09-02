@@ -47,7 +47,7 @@ import matplotlib.pyplot as plt
 from pandas.core.common import flatten
 from PIL import Image, ImageColor
 from timeit import default_timer as timer
-from utils.dataset import get_neighbor_paths, load_2_5D_image
+from utils.dataset import get_neighbor_paths, load_2_5D_image, get_filename_prefix
 
 
 
@@ -85,7 +85,22 @@ from streamlit.runtime.scriptrunner import get_script_run_ctx, add_script_run_ct
 from streamlit.web.server import Server
 from streamlit import runtime
 
+import yaml
 
+# Provide the full path to the YAML file
+config_path = 'D:/Donnees_pour_segmentation_RDN/data/deux_mini/data/yaml/train.yaml'
+
+# Open and load the YAML file
+with open(config_path, 'r') as file:
+    config = yaml.safe_load(file)
+
+# Now you can use the 'config' object in your script
+
+
+n_channels = config['model']['n_channels']
+n_classes = config['model']['class_num']
+dropout_rate = config['model']['dropout_rate']
+step = config['model']['step']
 
 
 # Variables that get reused on the various pages
@@ -578,7 +593,10 @@ def page_segmentations(state):
     segmentation_state_values(state)
 
     if st.button("Load model!") and state.model != None and state.use_gpu != None:
-        state.net = UNet_Light_RDN(n_channels=3, n_classes=3)
+        state.net = UNet_Light_RDN(n_channels=config['model']['n_channels'], 
+                           n_classes=config['model']['class_num'], 
+                           dropout_rate=config['model']['dropout_rate'])
+
         # Load in the trained model
         state.net.load_state_dict(
             torch.load(state.model, map_location=f"cuda:{state.use_gpu}")
@@ -844,7 +862,10 @@ def page_batch_segmentations(state):
         )
         st.write("---")
         if st.button("Load model!"):
-            state.net = UNet_Light_RDN(n_channels=3, n_classes=3)
+            state.net = UNet_Light_RDN(n_channels=config['model']['n_channels'], 
+                           n_classes=config['model']['class_num'], 
+                           dropout_rate=config['model']['dropout_rate'])
+
             # Load in the trained model
             state.net.load_state_dict(
                 torch.load(state.model, map_location=f"cuda:{state.use_gpu}")
@@ -2390,7 +2411,10 @@ def gpu_selector(num_gpus):
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=3, n_classes=3)
+    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], 
+                           n_classes=config['model']['class_num'], 
+                           dropout_rate=config['model']['dropout_rate'])
+
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f"cuda:{int(cuda_index)}"))
     net.cuda()
@@ -3574,7 +3598,7 @@ def color_overlay(
 #####
 
 
-def three_class_segmentation(input_image, outDir, outType, network="", n_channels=3, step=1):
+def three_class_segmentation(input_image, outDir, outType, network="", n_channels=config['model']['n_channels'], step=step):
     """
     Function to segment a directory of 2.5D images using a pytorch model.
     Images must be in a SimpleITK readable format (e.g. "tif", "png", "jpg", "bmp", "mhd", "nii", etc.)
@@ -3618,10 +3642,10 @@ def three_class_segmentation(input_image, outDir, outType, network="", n_channel
         directory = pathlib.Path(image_name).parent  # The directory where the images are stored
 
         # Get neighboring paths
-        neighbors = get_neighbor_paths(image_index, str(directory), n_channels=n_channels, step=step)
+        neighbors = get_neighbor_paths(image_index, str(directory), n_channels=config['model']['n_channels'], step=step)
 
         # Load the 2.5D image stack
-        image = load_2_5D_image(image_index, str(directory), n_channels=n_channels, step=step)
+        image = load_2_5D_image(image_index, str(directory), n_channels=config['model']['n_channels'], step=step)
 
         # Convert to PyTorch tensor, normalize, and move to GPU
         image = torch.from_numpy(image).float() / 255.0

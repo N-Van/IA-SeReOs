@@ -516,6 +516,7 @@ def main():
             previous_weight_decay = train_yaml_file["optimizer"]["weight_decay"]
             previous_n_channels = train_yaml_file["model"]["n_channels"]  # Extract n_channels
             previous_step = train_yaml_file["model"]["step"]  # Extract step
+            previous_dropout_rate = train_yaml_file["model"].get("dropout_rate", 0.5)  # Extract dropout_rate with default value 0.5
 
             # Columns for the standard settings
             yaml_col_1, yaml_col_2, yaml_col_3, yaml_col_4, yaml_col_5 = st.columns([1, 1, 1, 1, 1])  # Added another column
@@ -533,6 +534,8 @@ def main():
                 epochs_num = st.text_input("Input epochs (an integer):", f"{previous_epoch}")
 
             with yaml_col_5:
+                dropout_rate = st.text_input("Dropout rate (default is 0.5):", f"{previous_dropout_rate}")
+
                 if st.checkbox("Train from a previously trained model?"):
                     state.train_from_previous = True
                     previous_model = st.file_uploader("Select model", type=["pth"], accept_multiple_files=False)
@@ -568,12 +571,12 @@ def main():
                         st.write(f"Between 1e-08 and 1e-16")
                         st.info(f"Current: {epsilon}")
 
-                with yaml_col_2:
-                    if optimizer == "AdaBelief":
-                        period_size = False
-                        "Step size is algorithmically controlled."
-                    else:
-                        period_size = st.text_input("Input period (an integer):", f"{previous_period}")
+                    with yaml_col_2:
+                        if optimizer == "AdaBelief":
+                            period_size = False
+                            "Step size is algorithmically controlled."
+                        else:
+                            period_size = st.text_input("Input period (an integer):", f"{previous_period}")
             else:
                 optimizer = "Adam"
                 learning_rate = previous_learning_rate
@@ -625,13 +628,15 @@ def main():
                 train_yaml_file["csv_path"]["val"] = str(data_path.joinpath("val.csv").as_posix())
                 train_yaml_file["csv_path"]["ratios"] = str(data_path.joinpath("ratios.csv").as_posix())
 
-                # Set the n_channels and step parameters in the YAML
+                # Set the n_channels, step, and dropout_rate parameters in the YAML
                 train_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to YAML
                 train_yaml_file["model"]["step"] = int(step)  # Save the updated step to YAML
+                train_yaml_file["model"]["dropout_rate"] = float(dropout_rate)  # Save the updated dropout_rate to YAML
 
-                # Test YAML - Set the n_channels and step
+                # Test YAML - Set the n_channels, step, and dropout_rate
                 test_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to test YAML
                 test_yaml_file["model"]["step"] = int(step)  # Save the updated step to test YAML
+                test_yaml_file["model"]["dropout_rate"] = float(dropout_rate)  # Save the updated dropout_rate to test YAML
 
                 test_yaml_file["gpu_config"]["gpu_name"] = int(state.use_gpu)
                 test_yaml_file["path"]["data_path"] = str(data_path.joinpath("dataset.hdf5").as_posix())
@@ -660,6 +665,7 @@ def main():
             st.warning(f"You need to put good segmented training data")
         elif state.unsegmented_imgs == None and state.segmented_imgs == None:
             st.warning(f"You need to put good unsegmented and segmented training data")
+
 
 
 
@@ -805,9 +811,10 @@ def main():
                 validation_csv = config["csv_path"]["val"]
                 ratio_csv = config["csv_path"]["ratios"]
 
-                # n_channels and step variables
+                # n_channels, step, and dropout_rate variables
                 n_channels = config["model"].get("n_channels", 1)  # Default to 1 if not found
                 step = config["model"].get("step", 1)  # Default to 1 if not found
+                dropout_rate = config["model"].get("dropout_rate", 0.5)  # Default to 0.5 if not found
 
                 with config_col_1:
                     st.header("Graphics card")
@@ -855,9 +862,10 @@ def main():
                     st.info(f"Starting training from model {model_start}")
                 st.info(f"Models will be written to {save_path.as_posix()}")
 
-                # Display the n_channels and step variables
+                # Display the n_channels, step, and dropout_rate variables
                 st.info(f"n_channels: {n_channels}")  # Display the n_channels
                 st.info(f"step: {step}")  # Display the step
+                st.info(f"dropout_rate: {dropout_rate}")  # Display the dropout_rate
 
                 # If the folders don't exist we make them
                 if not model_save_path.exists():
@@ -868,16 +876,16 @@ def main():
                     st.info(f"Making {save_path}")
                     save_path.mkdir()
 
-
-
-
             # get model
             if st.checkbox("Intialize UNet"):
                 # check if gpu is available
                 if config['gpu_config']['use_gpu']:
                     torch.cuda.set_device(config['gpu_config']['gpu_name'])  # '1','0'
 
-                net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'])
+                net = UNet_Light_RDN(n_channels=config['model']['n_channels'], 
+                                    n_classes=config['model']['class_num'],
+                                    dropout_rate=config['model']['dropout_rate'])  # Added dropout_rate here
+
                 if state.train_from_previous:
                     if config['model']['path'] is not None:
                         if config['gpu_config']['use_gpu']:
@@ -902,8 +910,6 @@ def main():
                     #learning rate schedule
                     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['period'], gamma=0.1)
 
-
-            
                 # save the yaml file to savepath
                 current_config = str(pathlib.Path(state.save_path).joinpath('Config.yaml'))
                 st.write(f"Saving session configuration to {current_config}")
@@ -911,111 +917,90 @@ def main():
                     yaml.dump(config, file)
 
                 # get training Epoch
-                Epoch = config['train_param']['Epoch'] # WTF le nom de variable
+                Epoch = config['train_param']['Epoch']
 
                 # load patches and ratios
                 train_patches = load_patches(config['csv_path']['train'])
                 val_patches = load_patches(config['csv_path']['val'])
-                ratios = load_patches(config['csv_path']['ratios']) # WTF On charge les ratios avec la meme fonction que les patches. 
+                ratios = load_patches(config['csv_path']['ratios'])
                 period = config['period']
-                if period == None: # WTF. Si period = None, une exception et puis c'est tout.
-                    # This gets used later to ramp up the amount of non-bone that is being thrown into the training.
-                    # May have to think of a fancy way to get an equivelant number with Adabelief, but it is being set
-                    # to the default Adam period for now. # Who's talking?
+                if period == None:
                     period = 8
                 
-                # create train transform # WTF! Apres toutes les manips d'avant on decide ici que outpsize = 64 !
-                train_transform = transforms.Compose([dp.Augmentation(output_size=64), #config['output_size']
+                # create train transform
+                train_transform = transforms.Compose([dp.Augmentation(output_size=64),  # config['output_size']
                                                     dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
                 val_transform = transforms.Compose([dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
-                # if st.button("Launch Tensorboard !"):
-                    
-                #     subprocess.call('tensorboard --logdir=runs', shell=True)
-                #     st.write(f"TensorBoard 2.10.0 at http://localhost:6006/#timeseries")
-                    
+                
                 if st.button("Train model!"):
                     # training
 
                     progress_bar = st.progress(0)
                     epoch_count = 0
-                    #st.write(f"TensorBoard is availaible, run this following command in a terminal : tensorboard --logdir=runs")
                     st.sidebar.write(f"Epoch progress:")
                     st.write(f"Progress training {Epoch} epochs...")
                     total_timer = timer()
                     iteration = 0
                     nb_ite = 0
-                    #subprocess.call('echo "TensorBoard available, run this command to enable it : tensorboard --logdir=runs"', shell=True)
-                    for i_epoch in range(Epoch): # WTF c'etait trop compliqué d'écrire une fonction air_rate = f(i_epoch, period) ?
+
+                    for i_epoch in range(Epoch):
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
                         if i_epoch < period:
-                            #dirt_rate = 0.5
                             air_rate = 0.1
                         elif i_epoch < 2 * period and i_epoch >= period:
-                            #dirt_rate = 0.3
                             air_rate = 0.2
                         elif i_epoch < 3 * period and i_epoch >= 2 * period:
-                            #dirt_rate = 0.1
                             air_rate = 0.4
                         else:
-                            #dirt_rate = 0.0
                             air_rate = 0.5
 
-                        #Get patches # WTF le nom. patches designe en fait un subset de train_patches
+                        # Get patches
                         patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=0,
-                                                   patches=train_patches, ratios=ratios) # WTF. Apparamment c'est le seul endroit ou dirt_choose_threshold est defini
-                        # WTF le nom. DEB_patches designe en fait un subset de train_patches
+                                                        patches=train_patches, ratios=ratios)
                         DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
                         data_set = HDF52D(
-                                        data_path='D:/Donnees_pour_segmentation_RDN/data/os_petreux_mini/data/dataset.hdf5',
+                                        data_path=config['path']['data_path'],
                                         train_patches=train_patches,
                                         val_patches=val_patches,
                                         train_transform=train_transform,
                                         val_transform=val_transform,
                                         n_channels=config['model']['n_channels'],
                                         step=config['model']['step'],
-                                        image_dir = str(state.unseg_dir).replace("\\", "/")   # The directory containing .tif images
+                                        image_dir=str(state.unseg_dir).replace("\\", "/")  # The directory containing .tif images
                                         )
 
                         DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
-                                        train_transform=train_transform,
-                                        val_transform=val_transform,
-                                        train_idx=index,
-                                        n_channels=config['model']['n_channels'],
-                                        step=config['model']['step'],
-                                        image_dir = str(state.unseg_dir).replace("\\", "/")   # Add the correct image directory here
-                                        )
+                                            train_transform=train_transform,
+                                            val_transform=val_transform,
+                                            train_idx=index,
+                                            n_channels=config['model']['n_channels'],
+                                            step=config['model']['step'],
+                                            image_dir=str(state.unseg_dir).replace("\\", "/")  # Add the correct image directory here
+                                            )
 
                         train_data_loader = []
 
                         current_batch = int(config['data_loader']['batch_size'])
 
-                        
-                        # train_data_loader.append(DataLoader(dataset=training_data_set,
-                        #                                     batch_size=current_batch,
-                        #                                     shuffle=True,
-                        #                                     num_workers=0))
-
+                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
+                                                            batch_size=current_batch,
+                                                            shuffle=True,
+                                                            num_workers=0))
 
                         train_data_loader.append(DataLoader(dataset=DEB_data_set,
                                                             batch_size=current_batch,
                                                             shuffle=True,
                                                             num_workers=0))
-                        
-                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
-                                                            batch_size=current_batch,
-                                                            shuffle=True,
-                                                            num_workers=0))
-                        
+
                         print(f"learning rate {optimizer.param_groups[0]['lr']:.6f}")
 
                         nb_ite = rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
-                                total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'], tensorboard_plot=True, nb_ite=nb_ite)
-                        #lr_scheduler.step()
+                                        total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'], tensorboard_plot=True, nb_ite=nb_ite)
 
                         # validating
                         val_loss, class_val = rdn_val(net, data_set,
@@ -1123,7 +1108,7 @@ def main():
                     model_path = model_validation_directory
 
                     # get model
-                    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'])
+                    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'], dropout_rate=config['model']['dropout_rate'] )
                     if config['gpu_config']['use_gpu']:
                         net.load_state_dict(torch.load(val_model,
                                                     map_location=torch.device(type='cuda',
@@ -1323,7 +1308,7 @@ def color_overlay(image, overlay_image, overlay_thresh=254, color=[100, 8, 58], 
 
 
 def model_initiation(model_path, cuda_index):
-    net = UNet_Light_RDN(n_channels=8, n_classes=3)
+    net = UNet_Light_RDN(n_channels=8, n_classes=3, dropout_rate = 0.5)
     # Load in the trained model
     net.load_state_dict(torch.load(model_path, map_location=f'cuda:{int(cuda_index)}'))
     net.cuda()
