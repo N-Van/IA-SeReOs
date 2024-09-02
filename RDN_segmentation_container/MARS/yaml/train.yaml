@@ -9,17 +9,18 @@ model:
   if_pre_train: true
   n_channels: 1
   class_num: 3
-  path: 'C:\Users\nbs49\Desktop\pytorch_segmentation\models\model_8.pth'
+  step: 1
+  path:
 optimizer:
   lr: 0.0005
   method: Adam
   weight_decay: 1.0e-08
 path:
-  data_path: 'C:/Users/nbs49/Desktop/pytorch_segmentation/data/dataset.hdf5'
-  save_path: 'C:/Users/nbs49/Desktop/pytorch_segmentation/data/new_model'
+  data_path: 
+  save_path:
 csv_path:
-  train: 'C:/Users/nbs49/Desktop/pytorch_segmentation/data/patches.csv'
-  val: 'C:/Users/nbs49/Desktop/pytorch_segmentation/data/val.csv'
-  ratios: 'C:/Users/nbs49/Desktop/pytorch_segmentation/data/ratios.csv'
+  train: 
+  val: 
+  ratios: 
 train_param:
-  Epoch: 60
+  Epoch: 20

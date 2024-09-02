@@ -3,6 +3,7 @@ gpu_config:
   use_gpu: true
 model:
   n_channels: 1
+  step: 1
   class_num: 3
   path: 'C:\Users\nbs49\Desktop\pytorch_segmentation\data\new_model\2020-10-17_17'
 path:
