@@ -53,6 +53,11 @@ from streamlit_apps.streamlit_utils import *
 from utils.train import rdn_train, rdn_val
 from utils.dataset import HDF52D, load_patches, natural_keys, get_filename_prefix
 
+from codecarbon import EmissionsTracker  # Import the EmissionsTracker
+import mlflow
+from torch.utils.tensorboard import SummaryWriter
+import subprocess
+from datetime import datetime
 
 #To easily adjust drop down menus
 supported_file_types = ["mhd", "nii", "tif", "png", "jpg", "bmp", "dcm"]
@@ -80,6 +85,16 @@ st.set_page_config(page_title="RDN model training",
 # if version_check == "above":
 #     with st.expander("View/hide warnings"):
 #         streamlit_minor(tested_version=73, below_above=version_check)
+
+
+
+
+
+# Function to generate a unique experiment name
+def generate_experiment_name():
+    return f"streamlit_training-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+
+
 
 
 def main():
@@ -476,18 +491,23 @@ def main():
         # state.unsegmented_training is the directory with training data
         # state.segmented_training is the directory with label data
 
-        # Where we will write the hdf5, yaml config, and model iterations
-        if state.unsegmented_imgs != None and state.segmented_imgs != None:
+        if state.unsegmented_imgs is not None and state.segmented_imgs is not None:
             data_path = state.unsegmented_training.parent.parent.joinpath("data")
-            train_yaml = str(script_dir.joinpath("yaml").joinpath("train.yaml"))
-            test_yaml = str(script_dir.joinpath("yaml").joinpath("test.yaml"))
+            new_yaml_path = data_path.joinpath("yaml")
+            new_train_yaml_name = new_yaml_path.joinpath("train.yaml")
+            new_test_yaml_name = new_yaml_path.joinpath("test.yaml")
             new_models_path = data_path.joinpath("new_model")
 
-            # Read in the default yaml information
-            train_yaml_file = read_train_yaml(yaml_file=train_yaml)
-            test_yaml_file = read_train_yaml(yaml_file=test_yaml)
+            # Create the YAML directory if it doesn't exist
+            if not new_yaml_path.exists():
+                new_yaml_path.mkdir(parents=True, exist_ok=True)  # Ensure directory is created
 
-            # Get the GPU device
+            # Proceed with the rest of the logic
+            # Read in the default yaml information
+            train_yaml_file = read_train_yaml(yaml_file=str(script_dir.joinpath("yaml").joinpath("train.yaml")))
+            test_yaml_file = read_train_yaml(yaml_file=str(script_dir.joinpath("yaml").joinpath("test.yaml")))
+
+            # Set up the GPU device
             device_num = initiate_cuda()
 
             # Check if we can set the GPU and return various error messages if we can't.
@@ -498,9 +518,8 @@ def main():
             cuda_mem = list(_convert_size(sizeBytes=cuda_mem))
 
             with st.expander("View/hide information"):
-                st.info(
-                    f"GPU set to device number {state.use_gpu}: {torch.cuda.get_device_properties(device=state.use_gpu).name}, "
-                    f"{cuda_mem[0]} of VRAM")
+                st.info(f"GPU set to device number {state.use_gpu}: {torch.cuda.get_device_properties(device=state.use_gpu).name}, "
+                        f"{cuda_mem[0]} of VRAM")
                 if float(cuda_mem[1]) < 5.0:
                     st.error("The amount of VRAM that you have makes training impossible. Sorry. :sob:")
                 elif float(cuda_mem[1]) < 8.0:
@@ -508,18 +527,19 @@ def main():
                 st.info(f"Training data save path: {data_path}")
                 st.info(f"New models will be saved to: {new_models_path}")
 
-            # Grab the information from the default yamls.
+            # Grab the information from the default YAMLs.
             previous_batch = train_yaml_file["data_loader"]["batch_size"]
             previous_period = train_yaml_file["period"]
             previous_epoch = train_yaml_file["train_param"]["Epoch"]
             previous_learning_rate = train_yaml_file["optimizer"]["lr"]
             previous_weight_decay = train_yaml_file["optimizer"]["weight_decay"]
-            previous_n_channels = train_yaml_file["model"]["n_channels"]  # Extract n_channels
-            previous_step = train_yaml_file["model"]["step"]  # Extract step
-            previous_dropout_rate = train_yaml_file["model"].get("dropout_rate", 0.5)  # Extract dropout_rate with default value 0.5
+            previous_n_channels = train_yaml_file["model"]["n_channels"]
+            previous_step = train_yaml_file["model"]["step"]
+            previous_dropout_rate = train_yaml_file["model"].get("dropout_rate", 0.0)
+            previous_output_size = train_yaml_file["model"].get("output_size", 64)  # Fetch output_size
 
-            # Columns for the standard settings
-            yaml_col_1, yaml_col_2, yaml_col_3, yaml_col_4, yaml_col_5 = st.columns([1, 1, 1, 1, 1])  # Added another column
+            # Collect inputs from the user
+            yaml_col_1, yaml_col_2, yaml_col_3, yaml_col_4, yaml_col_5, yaml_col_6 = st.columns([1, 1, 1, 1, 1, 1])
 
             with yaml_col_1:
                 batch_size = st.text_input("Input batch size (an integer):", f"{previous_batch}")
@@ -536,15 +556,18 @@ def main():
             with yaml_col_5:
                 dropout_rate = st.text_input("Dropout rate (default is 0.5):", f"{previous_dropout_rate}")
 
-                if st.checkbox("Train from a previously trained model?"):
-                    state.train_from_previous = True
-                    previous_model = st.file_uploader("Select model", type=["pth"], accept_multiple_files=False)
-                    try:
-                        pre_trained = torch.load(previous_model, map_location=f'cuda:{int(state.use_gpu)}')
-                    except AttributeError:
-                        st.info("Please navigate to or drop a .pth file above")
-                else:
-                    state.train_from_previous = False
+            with yaml_col_6:
+                output_size = st.text_input("Output size (default is 64):", f"{previous_output_size}")
+
+            if st.checkbox("Train from a previously trained model?"):
+                state.train_from_previous = True
+                previous_model = st.file_uploader("Select model", type=["pth"], accept_multiple_files=False)
+                try:
+                    pre_trained = torch.load(previous_model, map_location=f'cuda:{int(state.use_gpu)}')
+                except AttributeError:
+                    st.info("Please navigate to or drop a .pth file above")
+            else:
+                state.train_from_previous = False
 
             # If there are additional optimizer settings then they go under advanced use
             if st.checkbox("Advanced parameters"):
@@ -552,7 +575,6 @@ def main():
                 with yaml2_col_1:
                     optimizer = st.selectbox("Optimizer", supported_optimizers)
                 with yaml2_col_2:
-                    # Adam is the default, but any can be added to the list above and then settings can be passed over.
                     if optimizer == "AdaBelief":
                         learning_rate = st.text_input("Optimizer learning rate", f"{1e-03:.8f}")
                         learning_rate = f"{float(learning_rate):.1e}"
@@ -583,9 +605,11 @@ def main():
                 weight_decay = previous_weight_decay
 
             if st.button("Commit changes"):
+                # Set up the necessary paths and save configurations
                 state.data_path = data_path
-                if not data_path.exists():
-                    data_path.mkdir()
+
+                if not new_yaml_path.exists():
+                    new_yaml_path.mkdir(parents=True, exist_ok=True)
 
                 if state.train_from_previous:
                     pretrained_path = data_path.joinpath("pretrained_model")
@@ -628,15 +652,17 @@ def main():
                 train_yaml_file["csv_path"]["val"] = str(data_path.joinpath("val.csv").as_posix())
                 train_yaml_file["csv_path"]["ratios"] = str(data_path.joinpath("ratios.csv").as_posix())
 
-                # Set the n_channels, step, and dropout_rate parameters in the YAML
-                train_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to YAML
-                train_yaml_file["model"]["step"] = int(step)  # Save the updated step to YAML
-                train_yaml_file["model"]["dropout_rate"] = float(dropout_rate)  # Save the updated dropout_rate to YAML
+                # Set the n_channels, step, dropout_rate, and output_size parameters in the YAML
+                train_yaml_file["model"]["n_channels"] = int(n_channels)
+                train_yaml_file["model"]["step"] = int(step)
+                train_yaml_file["model"]["dropout_rate"] = float(dropout_rate)
+                train_yaml_file["model"]["output_size"] = int(output_size)  # Save output_size to YAML
 
                 # Test YAML - Set the n_channels, step, and dropout_rate
-                test_yaml_file["model"]["n_channels"] = int(n_channels)  # Save the updated n_channels to test YAML
-                test_yaml_file["model"]["step"] = int(step)  # Save the updated step to test YAML
-                test_yaml_file["model"]["dropout_rate"] = float(dropout_rate)  # Save the updated dropout_rate to test YAML
+                test_yaml_file["model"]["n_channels"] = int(n_channels)
+                test_yaml_file["model"]["step"] = int(step)
+                test_yaml_file["model"]["dropout_rate"] = float(dropout_rate)
+                test_yaml_file["model"]["output_size"] = int(output_size)  # Save output_size to test YAML
 
                 test_yaml_file["gpu_config"]["gpu_name"] = int(state.use_gpu)
                 test_yaml_file["path"]["data_path"] = str(data_path.joinpath("dataset.hdf5").as_posix())
@@ -644,27 +670,32 @@ def main():
 
                 test_yaml_file["csv_path"]["val"] = str(data_path.joinpath("val.csv").as_posix())
 
-                new_yaml_path = data_path.joinpath("yaml")
-                new_train_yaml_name = new_yaml_path.joinpath("train.yaml")
-                new_test_yaml_name = new_yaml_path.joinpath("test.yaml")
-                if not new_yaml_path.exists():
-                    new_yaml_path.mkdir()
-
+                # Save the updated train YAML configuration
                 with open(str(new_train_yaml_name), 'w') as f:
                     yaml.dump(train_yaml_file, f)
                     state.new_train_yaml_name = new_train_yaml_name
 
+                # Save the updated test YAML configuration
                 with open(str(new_test_yaml_name), 'w') as f:
                     yaml.dump(test_yaml_file, f)
                     state.new_test_yaml_name = new_test_yaml_name
 
+                # Store config in state for later use
+                state.config = train_yaml_file  # Save the config to state for later use
+
+                # Inform the user that parameters were written successfully
                 st.info(f"Training and validation parameters written to {new_yaml_path}")
-        elif state.unsegmented_imgs == None and state.segmented_imgs != None:
+
+        elif state.unsegmented_imgs is None and state.segmented_imgs is not None:
             st.warning(f"You need to put good unsegmented training data")
-        elif state.unsegmented_imgs != None and state.segmented_imgs == None:
+        elif state.unsegmented_imgs is not None and state.segmented_imgs is None:
             st.warning(f"You need to put good segmented training data")
-        elif state.unsegmented_imgs == None and state.segmented_imgs == None:
+        elif state.unsegmented_imgs is None and state.segmented_imgs is None:
             st.warning(f"You need to put good unsegmented and segmented training data")
+
+
+
+
 
 
 
@@ -710,8 +741,8 @@ def main():
                     st.always_train = None
             
             if st.button("Generate patches and validation data"):
-                output = 64
-               
+                output = state.config['model']['output_size']  # Access from the saved config in state 
+
                 val_names = generate_patches_streamlit(hdf5_file=hdf5_name, patches_csv=patches_name,
                                                     validation_csv=val_name, train_ratio=train_size,
                                                     stride=stride, output_size=output, always_train_csv=False)
@@ -768,6 +799,8 @@ def main():
             st.warning("Dataset path not defined. If you're looking to pick up where you left off, go back to "
                     "Setting up training parameters.")
         else:
+            
+
             new_yaml_path = state.data_path.joinpath("yaml")
             new_train_yaml_name = new_yaml_path.joinpath("train.yaml")
             new_test_yaml_name = new_yaml_path.joinpath("test.yaml")
@@ -811,10 +844,11 @@ def main():
                 validation_csv = config["csv_path"]["val"]
                 ratio_csv = config["csv_path"]["ratios"]
 
-                # n_channels, step, and dropout_rate variables
-                n_channels = config["model"].get("n_channels", 1)  # Default to 1 if not found
-                step = config["model"].get("step", 1)  # Default to 1 if not found
-                dropout_rate = config["model"].get("dropout_rate", 0.5)  # Default to 0.5 if not found
+                # n_channels, step, dropout_rate, and output_size variables
+                n_channels = config["model"].get("n_channels", 1)
+                step = config["model"].get("step", 1)
+                dropout_rate = config["model"].get("dropout_rate", 0.5)
+                output_size = config["model"].get("output_size")  # Retrieve output_size from YAML
 
                 with config_col_1:
                     st.header("Graphics card")
@@ -862,12 +896,13 @@ def main():
                     st.info(f"Starting training from model {model_start}")
                 st.info(f"Models will be written to {save_path.as_posix()}")
 
-                # Display the n_channels, step, and dropout_rate variables
-                st.info(f"n_channels: {n_channels}")  # Display the n_channels
-                st.info(f"step: {step}")  # Display the step
-                st.info(f"dropout_rate: {dropout_rate}")  # Display the dropout_rate
+                # Display the n_channels, step, dropout_rate, and output_size
+                st.info(f"n_channels: {n_channels}")
+                st.info(f"step: {step}")
+                st.info(f"dropout_rate: {dropout_rate}")
+                st.info(f"output_size: {output_size}")  # Display the output size
 
-                # If the folders don't exist we make them
+                # If the folders don't exist, we make them
                 if not model_save_path.exists():
                     st.info(f"Making {model_save_path}")
                     model_save_path.mkdir()
@@ -877,7 +912,7 @@ def main():
                     save_path.mkdir()
 
             # get model
-            if st.checkbox("Intialize UNet"):
+            if st.checkbox("Initialize UNet"):
                 # check if gpu is available
                 if config['gpu_config']['use_gpu']:
                     torch.cuda.set_device(config['gpu_config']['gpu_name'])  # '1','0'
@@ -890,8 +925,8 @@ def main():
                     if config['model']['path'] is not None:
                         if config['gpu_config']['use_gpu']:
                             net.load_state_dict(torch.load(config['model']['path'],
-                                                        map_location=torch.device(type='cuda',
-                                                                                    index=config['gpu_config']['gpu_name'])))
+                                                            map_location=torch.device(type='cuda',
+                                                                                        index=config['gpu_config']['gpu_name'])))
                         else:
                             net.load_state_dict(torch.load(config['model']['path']))
                 state.net = net
@@ -907,7 +942,7 @@ def main():
                                         config['optimizer']['method'])(net.parameters(),
                                                                     lr=config['optimizer']['lr'],
                                                                     weight_decay=config['optimizer']['weight_decay'])
-                    #learning rate schedule
+                    # learning rate schedule
                     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['period'], gamma=0.1)
 
                 # save the yaml file to savepath
@@ -924,11 +959,11 @@ def main():
                 val_patches = load_patches(config['csv_path']['val'])
                 ratios = load_patches(config['csv_path']['ratios'])
                 period = config['period']
-                if period == None:
+                if period is None:
                     period = 8
                 
                 # create train transform
-                train_transform = transforms.Compose([dp.Augmentation(output_size=64),  # config['output_size']
+                train_transform = transforms.Compose([dp.Augmentation(output_size=output_size),  # Use the output_size from the config
                                                     dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
@@ -936,9 +971,19 @@ def main():
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
                 
-                if st.button("Train model!"):
-                    # training
+                
 
+                # Training button and logic
+                if st.button("Train model!"):
+                    # Initialize TensorBoard log directory
+                   # tensorboard_logs_dir = f"D:/Donnees_pour_segmentation_RDN/data/runs/tensorboard_logs"#/{generate_experiment_name()}"
+                   # os.makedirs(tensorboard_logs_dir, exist_ok=True)
+                    # Store it in session state
+                   # st.session_state.tensorboard_logs_dir = tensorboard_logs_dir
+                    # Create the TensorBoard SummaryWriter
+                    writer = SummaryWriter()
+
+                    # Training setup
                     progress_bar = st.progress(0)
                     epoch_count = 0
                     st.sidebar.write(f"Epoch progress:")
@@ -947,8 +992,12 @@ def main():
                     iteration = 0
                     nb_ite = 0
 
+                    total_training_emissions = 0.0
+                    total_validation_emissions = 0.0
+
                     for i_epoch in range(Epoch):
                         st.sidebar.write(f"Epoch {epoch_count + 1} of {Epoch}")
+
                         if i_epoch < period:
                             air_rate = 0.1
                         elif i_epoch < 2 * period and i_epoch >= period:
@@ -958,21 +1007,25 @@ def main():
                         else:
                             air_rate = 0.5
 
+                        # Track emissions for training
+                        training_tracker = EmissionsTracker()
+                        training_tracker.start()
+
                         # Get patches
                         patches = get_minimum_dirt_patches(dirt_choose_threshold=0.1, dirt_rate=0,
-                                                        patches=train_patches, ratios=ratios)
+                                                            patches=train_patches, ratios=ratios)
                         DEB_patches, index = get_dirt_bone_patches(train_patches, ratios, air_rate)
 
                         data_set = HDF52D(
-                                        data_path=config['path']['data_path'],
-                                        train_patches=train_patches,
-                                        val_patches=val_patches,
-                                        train_transform=train_transform,
-                                        val_transform=val_transform,
-                                        n_channels=config['model']['n_channels'],
-                                        step=config['model']['step'],
-                                        image_dir=str(state.unseg_dir).replace("\\", "/")  # The directory containing .tif images
-                                        )
+                            data_path=config['path']['data_path'],
+                            train_patches=train_patches,
+                            val_patches=val_patches,
+                            train_transform=train_transform,
+                            val_transform=val_transform,
+                            n_channels=config['model']['n_channels'],
+                            step=config['model']['step'],
+                            image_dir=str(state.unseg_dir).replace("\\", "/")  # The directory containing .tif images
+                        )
 
                         DEB_data_set = HDF52D(config['path']['data_path'], DEB_patches, val_patches,
                                             train_transform=train_transform,
@@ -981,34 +1034,46 @@ def main():
                                             n_channels=config['model']['n_channels'],
                                             step=config['model']['step'],
                                             image_dir=str(state.unseg_dir).replace("\\", "/")  # Add the correct image directory here
-                                            )
+                        )
 
                         train_data_loader = []
-
                         current_batch = int(config['data_loader']['batch_size'])
-
+                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
+                                                            batch_size=current_batch,
+                                                            shuffle=True,
+                                                            num_workers=0))
                         train_data_loader.append(DataLoader(dataset=DEB_data_set,
                                                             batch_size=current_batch,
                                                             shuffle=True,
                                                             num_workers=0))
 
-                        train_data_loader.append(DataLoader(dataset=DEB_data_set,
-                                                            batch_size=current_batch,
-                                                            shuffle=True,
-                                                            num_workers=0))
 
-                        print(f"learning rate {optimizer.param_groups[0]['lr']:.6f}")
-
+                        # Train the model
                         nb_ite = rdn_train(net, optimizer, train_data_loader, epoch=i_epoch,
-                                        total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'], tensorboard_plot=True, nb_ite=nb_ite)
+                                        total_epoch=Epoch, use_gpu=config['gpu_config']['use_gpu'],
+                                        tensorboard_plot=True, nb_ite=nb_ite, writer=writer)
 
-                        # validating
+                        # Stop tracking emissions for training
+                        training_emissions = training_tracker.stop()
+                        total_training_emissions += training_emissions
+
+                        # Track emissions for validation
+                        validation_tracker = EmissionsTracker()
+                        validation_tracker.start()
+
+                        # Validate the model
                         val_loss, class_val = rdn_val(net, data_set,
                                                     use_gpu=config['gpu_config']['use_gpu'],
                                                     i_epoch=i_epoch,
                                                     class_num=config['model']['class_num'])
 
-                        # save model
+                        # Stop tracking emissions for validation
+                        validation_emissions = validation_tracker.stop()
+                        total_validation_emissions += validation_emissions
+
+                        st.write(f"Epoch {i_epoch + 1} emissions: Training - {training_emissions:.6f} kg CO2e, Validation - {validation_emissions:.6f} kg CO2e")
+
+                        # Save model
                         save_name = state.save_path.joinpath(f"Loss-{epoch_count}_{val_loss:.6f}.pth")
                         torch.save(net.state_dict(), save_name)
                         class_val = pd.DataFrame(class_val)
@@ -1017,29 +1082,82 @@ def main():
                         epoch_count += 1
                         iteration = np.floor((100 * epoch_count) / int(Epoch))
                         progress_bar.progress(int(iteration))
+
                     st.balloons()
                     st.info(':joy: :rainbow: Training is finished! :rainbow: :joy:')
+                    st.write(f"Total Training Emissions: {total_training_emissions:.6f} kg CO2e")
+                    st.write(f"Total Validation Emissions: {total_validation_emissions:.6f} kg CO2e")
+                    st.write(f"Total Combined Emissions: {total_training_emissions + total_validation_emissions:.6f} kg CO2e")
+
                     _end_timer(start_timer=total_timer, message="Total training of model")
+                    writer.close()
+
+
+                # Place TensorBoard and MLflow buttons outside the training block
+                tensorboard_button = st.button("Launch TensorBoard Visualization")
+                mlflow_button = st.button("Launch MLflow Tracking")
+
+                if tensorboard_button:
+                    # Launch TensorBoard without requiring tensorboard_logs_dir
+                    tensorboard_command = ['tensorboard', '--port', '6006']
+                    st.write("Launching TensorBoard... Please wait.")
+                    
+                    # Launch TensorBoard in a subprocess
+                    subprocess.Popen(tensorboard_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    
+                    # Provide the URL for TensorBoard
+                    tensorboard_url = 'http://127.0.0.1:6006'
+                    st.write(f"You can access TensorBoard at {tensorboard_url}")
+
+                if mlflow_button:
+                    # Read MLflow experiment and run IDs from the file
+                    try:
+                        with open('mlflow_run_info.txt', 'r') as f:
+                            lines = f.readlines()
+                            experiment_id = lines[0].strip().split(': ')[1]
+                            run_id = lines[1].strip().split(': ')[1]
+                    except FileNotFoundError:
+                        st.error("MLflow run info file not found.")
+                        st.stop()
+                    except IndexError:
+                        st.error("Error reading MLflow run info.")
+                        st.stop()
+
+                    # Start MLflow UI in a subprocess
+                    mlflow_ui_command = ['mlflow', 'ui', '--host', '127.0.0.1', '--port', '5000']
+                    st.write("Launching MLflow... Please wait.")
+                    subprocess.Popen(mlflow_ui_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    
+                    # Provide the URL for MLflow with run ID
+                    mlflow_url = f'http://127.0.0.1:5000/#/experiments/{experiment_id}/runs/{run_id}'
+                    st.write(f"You can access MLflow at {mlflow_url}")
+  
+
+
+
+            
+
+
+
 
     if model_settings_activity == "Validate model":
         if state.data_path in [None, "None", "."]:
             st.warning("Dataset path not defined. If you're looking to pick up where you left off, go back to "
-                       "Setting up training parameters.")
+                    "Setting up training parameters.")
         else:
             new_yaml_path = state.data_path.joinpath("yaml")
             new_test_yaml_name = new_yaml_path.joinpath("test.yaml")
 
             criterion_df = np.array([])
-            # class_overlap = pd.array([])
             class_overlap = pd.DataFrame()
             if st.checkbox("Load validation parameters"):
                 validate_yaml = read_test_yaml(str(new_test_yaml_name))
                 state.validate_yaml = validate_yaml
 
-                #GPU device index
+                # GPU device index
                 gpu_ID = validate_yaml["gpu_config"]["gpu_name"]
 
-                #Data path for the hdf5
+                # Data path for the hdf5
                 train_data = validate_yaml["path"]["data_path"]
                 validation_csv = validate_yaml["csv_path"]["val"]
 
@@ -1075,8 +1193,9 @@ def main():
                         model_list.sort(key=natural_keys)
                         st.info(f"Found {len(model_list)} models to validate")
 
-            # parsing the input parameter
+            # Parsing the input parameter
             if st.button("Validate"):
+
                 save_path = pathlib.Path(str(model_validation_directory))
                 criterion_output = save_path.joinpath("Model_scores.csv")
                 class_output = save_path.joinpath("Class_overlap.csv")
@@ -1088,27 +1207,32 @@ def main():
                 if config['gpu_config']['use_gpu']:
                     torch.cuda.set_device(config['gpu_config']['gpu_name'])  # '1','0'
 
-                # get nets' name list and sort by creation time
-                # create train transform
+                # Create transform for validation
                 val_transform = transforms.Compose([dp.adjustMask(class_num=config['model']['class_num']),
                                                     dp.Normalize(max=255, min=0),
                                                     dp.ToTensor()])
                 data_set = HDF52D(config['path']['data_path'], [], config['csv_path']['val'], val_transform=val_transform,
-                                  n_channels=config['model']['n_channels'],
-                                  step=config['model']['step'],
-                                  image_dir = str(state.unseg_dir).replace("\\", "/")   # Add the correct image directory here
-                                  )
+                                n_channels=config['model']['n_channels'],
+                                step=config['model']['step'],
+                                image_dir=str(state.unseg_dir).replace("\\", "/"))
                 data_set.val()
 
+                total_validation_emissions = 0.0
                 progress_bar = st.progress(0)
                 model_count = 0
                 num_models = len(model_list)
                 state.model_list = model_list
+
+
                 for val_model in model_list:
                     model_path = model_validation_directory
 
+                    # Track emissions for model validation
+                    validation_tracker = EmissionsTracker(project_name="validate_model")
+                    validation_tracker.start()
+
                     # get model
-                    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'], dropout_rate=config['model']['dropout_rate'] )
+                    net = UNet_Light_RDN(n_channels=config['model']['n_channels'], n_classes=config['model']['class_num'], dropout_rate=config['model']['dropout_rate'])
                     if config['gpu_config']['use_gpu']:
                         net.load_state_dict(torch.load(val_model,
                                                     map_location=torch.device(type='cuda',
@@ -1119,6 +1243,7 @@ def main():
                     print(f'Model Path: {model_path}.')
                     criterion, class_o = rdn_val(net, data_set,
                                                 use_gpu=config['gpu_config']['use_gpu'],
+                                                i_epoch=None,  # For validation, no need for epoch tracking here
                                                 class_num=config['model']['class_num'])
                     print(f"Total score: {criterion}\n")
                     class_o = pd.DataFrame([class_o], index=[f"Model_{model_count}"]).T
@@ -1127,6 +1252,13 @@ def main():
                     model_count += 1
                     iteration = np.floor((100 * model_count) / int(num_models))
                     progress_bar.progress(int(iteration))
+
+                    # Stop tracking emissions for validation
+                    validation_emissions = validation_tracker.stop()
+                    total_validation_emissions += validation_emissions
+
+                    st.write(f"Model {model_count} emissions: Validation - {validation_emissions:.6f} kg CO2e")
+
 
                 # Save the Dice Overlap scores.
                 criterion_df = pd.DataFrame(criterion_df)
@@ -1142,6 +1274,7 @@ def main():
                 state.class_overlap_df = class_overlap
 
                 st.write('Validating is finished.')
+                st.write(f"Total Validation Emissions: {total_validation_emissions:.6f} kg CO2e")
 
                 st.balloons()
                 validation_col1, validation_col2 = st.columns([1, 1])
@@ -1153,10 +1286,10 @@ def main():
                     st.write(criterion_df.head(3))
                 state.validated_models = True
 
-            #Save the model so people can name it whatever they want
+            # Save the model so people can name it whatever they want
             if state.validated_models:
                 model_col_1, model_col_2, model_col_3 = st.columns([1, 1, 1])
-                #Give the top 10 choices, because why not?
+                # Give the top 10 choices, because why not?
                 model_list = list(state.class_overlap_df.index[:10])
                 with model_col_1:
                     save_model = st.selectbox("Select the model to save?", model_list)
@@ -1170,7 +1303,7 @@ def main():
                         st.write("\n")
                         save_name = f"{save_model}.pth"
 
-                        #Grab the file from the directory to engage the web browser save dialouge, which is cleaner
+                        # Grab the file from the directory to engage the web browser save dialogue, which is cleaner
                         with open(selected_model, 'rb') as f:
                             selected = f.read()
 
@@ -1181,6 +1314,7 @@ def main():
                         st.markdown(download_button_str, unsafe_allow_html=True)
                     else:
                         st.error("Whoops. Something went wrong, did the model path change or a drive disconnect?")
+
 
     if model_settings_activity == "Model gallery":
         hdf5_file = None
@@ -1585,9 +1719,12 @@ def create_hdf5(save_name: str, data_set_names: List, data_dir: Union[str, pathl
             sample_img.create_dataset('label', data=load_img(str(label_dir.joinpath(f"{data_name['label']}"))))
 
 
-def generate_patches_streamlit(hdf5_file : Union[str, pathlib.Path], patches_csv: Union[str, pathlib.Path],
-                               validation_csv: Union[str, pathlib.Path], train_ratio: float = 0.7,
-                               stride: int = 32, output_size=256, always_train_csv: Union[str, bool] = False):
+def generate_patches_streamlit(hdf5_file: Union[str, pathlib.Path], patches_csv: Union[str, pathlib.Path],
+                               validation_csv: Union[str, pathlib.Path], 
+                               stride: int, output_size,  # Non-default arguments first
+                               train_ratio: float = 0.7,  # Default argument after
+                               always_train_csv: Union[str, bool] = False):  # Default argument
+
 
     with h5py.File(hdf5_file, 'r') as data_f:
         names_list = list(data_f.keys())
@@ -1624,9 +1761,11 @@ def generate_patches_streamlit(hdf5_file : Union[str, pathlib.Path], patches_csv
     st.info(f"Generated {len(patches)} patches")
     return val_names
 
-def generate_patches(hdf5_file : Union[str, pathlib.Path], patches_csv: Union[str, pathlib.Path],
-                               validation_csv: Union[str, pathlib.Path], train_ratio: float = 0.7,
-                               stride: int = 32, output_size=256, always_train_csv: Union[str, bool] = False):
+def generate_patches(hdf5_file: Union[str, pathlib.Path], patches_csv: Union[str, pathlib.Path],
+                     validation_csv: Union[str, pathlib.Path], 
+                     stride: int, output_size,  # Non-default arguments first
+                     train_ratio: float = 0.7,  # Default argument
+                     always_train_csv: Union[str, bool] = False):  # Default argument
 
     with h5py.File(hdf5_file, 'r') as data_f:
         names_list = list(data_f.keys())
@@ -1677,7 +1816,7 @@ def remove_from_validation_set(names_list: List, always_train_csv: Union[str, pa
     train_names = train_names + set_aside
     return train_names, val_names
 
-def get_patches(hdf5_file: Union[str, pathlib.Path], train_names: Union[List, Tuple], stride: int = 32, output_size: int = 256):
+def get_patches(hdf5_file: Union[str, pathlib.Path], train_names: Union[List, Tuple], stride: int , output_size: int ):
     patches = []
     with h5py.File(hdf5_file, 'r') as data_file:
         for name in train_names:
